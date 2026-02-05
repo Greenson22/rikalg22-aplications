@@ -1,13 +1,23 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import { SidebarItem } from "../fragments/SidebarItem";
-import { LayoutDashboard, Users, Settings, PieChart, Wallet, Bell, Search } from "lucide-react";
+import { LayoutDashboard, FileText, Bell, Search } from "lucide-react";
 import { Button } from "../elements/Button";
 
+// Import view yang akan ditampilkan
+import { DashboardView } from "../views/DashboardView"; 
+import { SuratLamaranView } from "../views/SuratLamaranView";
+
 interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode; // Optional karena kita handle content secara internal sekarang
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+  // State untuk melacak halaman mana yang aktif
+  // Defaultnya 'overview'
+  const [activePage, setActivePage] = useState<'overview' | 'surat'>('overview');
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black flex">
       {/* Sidebar */}
@@ -16,15 +26,25 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             RikalG22
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">Dashboard Admin</p>
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mt-1">
+            Frendy Rikal Gerung
+          </p>
+          <p className="text-xs text-zinc-400 mt-0.5">Dashboard Admin</p>
         </div>
         
         <nav className="flex-1 px-4 space-y-1">
-          <SidebarItem icon={LayoutDashboard} label="Overview" active />
-          <SidebarItem icon={Users} label="Audience" />
-          <SidebarItem icon={Wallet} label="Revenue" />
-          <SidebarItem icon={PieChart} label="Analytics" />
-          <SidebarItem icon={Settings} label="Settings" />
+          <SidebarItem 
+            icon={LayoutDashboard} 
+            label="Overview" 
+            active={activePage === 'overview'} 
+            onClick={() => setActivePage('overview')} // Ubah state saat diklik
+          />
+          <SidebarItem 
+            icon={FileText} 
+            label="Surat Lamaran" 
+            active={activePage === 'surat'} 
+            onClick={() => setActivePage('surat')} // Ubah state saat diklik
+          />
         </nav>
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
@@ -59,9 +79,15 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             </div>
         </header>
 
-        {/* Dynamic Content */}
+        {/* Dynamic Content: Render Berdasarkan State */}
         <div className="p-6 max-w-7xl mx-auto">
-          {children}
+          {activePage === 'overview' ? (
+             // Jika ada children bawaan, tampilkan children (jika digunakan sebagai wrapper), 
+             // atau default ke DashboardView jika children kosong
+             children || <DashboardView />
+          ) : (
+             <SuratLamaranView />
+          )}
         </div>
       </main>
     </div>
