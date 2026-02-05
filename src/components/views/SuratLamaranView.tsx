@@ -12,7 +12,7 @@ export const SuratLamaranView = () => {
   // State & Ref untuk Tanda Tangan
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 }); // Posisi relatif tanda tangan
+  const [position, setPosition] = useState({ x: 0, y: 0 }); 
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragItemRef = useRef<HTMLImageElement>(null);
@@ -43,8 +43,6 @@ export const SuratLamaranView = () => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    
-    // Handle both mouse and touch events safely
     let clientX, clientY;
     if ('touches' in e) {
        clientX = e.touches[0].clientX;
@@ -53,7 +51,6 @@ export const SuratLamaranView = () => {
        clientX = (e as React.MouseEvent).clientX;
        clientY = (e as React.MouseEvent).clientY;
     }
-
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
@@ -67,10 +64,7 @@ export const SuratLamaranView = () => {
     if (!isDrawing.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    
-    // Prevent scrolling on touch
     if ('touches' in e) e.preventDefault();
-
     const p = getPos(e);
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
@@ -113,18 +107,13 @@ export const SuratLamaranView = () => {
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     setIsDragging(true);
-    
-    // Calculate offset logic here if needed, keeping simple for this snippet
   };
 
-  // Global mouse move/up listener for dragging
   useEffect(() => {
     const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging || !dragItemRef.current) return;
-      
       const parentRect = dragItemRef.current.parentElement?.getBoundingClientRect();
       if (!parentRect) return;
-
       let clientX, clientY;
       if ('touches' in e) {
           clientX = e.touches[0].clientX;
@@ -133,11 +122,8 @@ export const SuratLamaranView = () => {
           clientX = (e as MouseEvent).clientX;
           clientY = (e as MouseEvent).clientY;
       }
-
-      // Simple relative positioning within the signature container
       const x = clientX - parentRect.left - (dragItemRef.current.width / 2);
       const y = clientY - parentRect.top - (dragItemRef.current.height / 2);
-      
       setPosition({ x, y });
     };
 
@@ -149,7 +135,6 @@ export const SuratLamaranView = () => {
       window.addEventListener('touchmove', handleGlobalMove, { passive: false });
       window.addEventListener('touchend', handleGlobalUp);
     }
-
     return () => {
       window.removeEventListener('mousemove', handleGlobalMove);
       window.removeEventListener('mouseup', handleGlobalUp);
@@ -160,10 +145,11 @@ export const SuratLamaranView = () => {
 
 
   return (
-    <div className="flex flex-col items-center w-full bg-zinc-100 dark:bg-black py-8 min-h-screen">
+    <div className="flex flex-col items-center w-full min-h-full pb-10">
       
       {/* --- CONTROL PANEL --- */}
-      <div className="bg-zinc-800 text-white p-4 rounded-xl shadow-lg mb-8 flex flex-wrap gap-6 items-center sticky top-20 z-20 print:hidden">
+      {/* Tidak ada class 'sticky' disini, jadi akan ikut terscroll hilang */}
+      <div className="bg-zinc-800 text-white p-4 rounded-xl shadow-lg mb-8 flex flex-wrap gap-6 items-center print:hidden w-full max-w-4xl">
         <div className="font-bold flex items-center gap-2">
             <span>🎛️ Atur Halaman</span>
         </div>
@@ -222,7 +208,6 @@ export const SuratLamaranView = () => {
                 .page-container-print { 
                     position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; 
                 }
-                /* Hide sidebar, headers, etc when printing */
                 nav, aside, header, .no-print { display: none !important; }
             }
         `}</style>
@@ -296,13 +281,12 @@ export const SuratLamaranView = () => {
                     />
                 )}
 
-                {/* Text Nama (Static) */}
                 <p className="font-bold underline mt-20 relative z-0">Frendy Rikal Gerung</p>
             </div>
         </div>
       </div>
 
-      {/* --- TOOLS TANDA TANGAN (Hanya muncul di layar/no-print) --- */}
+      {/* --- TOOLS TANDA TANGAN --- */}
       <div className="mt-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm text-center print:hidden w-full max-w-md">
         <h3 className="text-zinc-900 dark:text-white font-bold mb-4">Area Tanda Tangan</h3>
         
