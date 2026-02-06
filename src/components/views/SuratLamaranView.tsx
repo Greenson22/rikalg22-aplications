@@ -3,7 +3,7 @@ import {
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
   ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle, Save, FilePlus, ChevronDown, ChevronUp,
-  ListChecks, GripVertical
+  ListChecks, Zap
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
@@ -15,6 +15,7 @@ interface DataRow {
   isBold?: boolean;
 }
 
+// Interface untuk Lampiran dengan status Checklist
 interface AttachmentItem {
   id: string;
   text: string;
@@ -26,7 +27,7 @@ interface UserProfile {
   profileName: string; 
   fullName: string;
   details: DataRow[];
-  attachments?: AttachmentItem[]; // Simpan preferensi lampiran juga
+  attachments?: AttachmentItem[]; 
 }
 
 export const SuratLamaranView = () => {
@@ -40,7 +41,8 @@ export const SuratLamaranView = () => {
   const [showDetailInputs, setShowDetailInputs] = useState(true);
   const [showAttachmentInputs, setShowAttachmentInputs] = useState(true);
 
-  // --- STATE TARGET LAMARAN (Untuk AI Prompt) ---
+  // --- STATE AI GENERATOR ---
+  const [promptLength, setPromptLength] = useState<'normal' | 'short'>('normal'); // <--- STATE BARU UNTUK PANJANG SURAT
   const [targetJob, setTargetJob] = useState({
     position: '',
     company: '',
@@ -92,7 +94,7 @@ export const SuratLamaranView = () => {
     { id: '6', label: 'Email', value: 'frendegerung634@gmail.com' },
   ]);
 
-  // 5. Lampiran (Updated to Object Array)
+  // 5. Lampiran (Updated to Object Array for Checkbox)
   const [attachments, setAttachments] = useState<AttachmentItem[]>([
     { id: '1', text: "Daftar Riwayat Hidup (CV)", isChecked: true },
     { id: '2', text: "Portofolio", isChecked: true },
@@ -135,12 +137,10 @@ export const SuratLamaranView = () => {
     } else if (type === 'detail') {
       setPersonalDetails(prev => [...prev, { id: Date.now().toString(), label: 'Label Baru', value: 'Isi Data...' }]);
     } else if (type === 'attachment') {
-      // Menambah lampiran baru via tombol di kertas (default checked)
       setAttachments(prev => [...prev, { id: Date.now().toString(), text: "Dokumen Baru...", isChecked: true }]);
     }
   };
 
-  // Helper khusus untuk Attachment di Sidebar
   const toggleAttachment = (id: string) => {
     setAttachments(prev => prev.map(a => a.id === id ? { ...a, isChecked: !a.isChecked } : a));
   };
@@ -176,7 +176,7 @@ export const SuratLamaranView = () => {
       profileName,
       fullName: nameRow,
       details: personalDetails,
-      attachments: attachments // Simpan state lampiran juga
+      attachments: attachments 
     };
 
     const updated = [...savedProfiles, newProfile];
@@ -245,7 +245,7 @@ export const SuratLamaranView = () => {
         if(data.paragraphs && Array.isArray(data.paragraphs)) setBodyParagraphs(data.paragraphs);
         if(data.details && Array.isArray(data.details)) setPersonalDetails(data.details);
         if(data.closing) setClosingData(prev => ({...prev, ...data.closing}));
-        // Optional: Jika AI mengembalikan array string untuk attachments
+        
         if(data.attachments && Array.isArray(data.attachments)) {
              setAttachments(data.attachments.map((txt: string) => ({
                  id: Date.now().toString() + Math.random(),
@@ -262,14 +262,21 @@ export const SuratLamaranView = () => {
 
   const generateDynamicPrompt = () => { 
     const personalInfoString = personalDetails.map(d => `- ${d.label}: ${d.value}`).join('\n');
-    // Hanya gunakan lampiran yang dicentang
     const attachmentsString = attachments.filter(a => a.isChecked).map(a => a.text).join(', ');
+
+    // --- LOGIC PROMPT STYLE ---
+    let styleInstruction = "";
+    if (promptLength === 'short') {
+        styleInstruction = "Buatlah isi surat yang SINGKAT, PADAT, dan TO-THE-POINT (maksimal 2 paragraf pendek). Hindari basa-basi yang berlebihan, langsung pada skill utama.";
+    } else {
+        styleInstruction = "Buatlah isi surat dengan struktur standar profesional (3 paragraf: Pembuka, Inti/Skill, dan Penutup/Harapan). Gunakan bahasa yang sopan dan persuasif.";
+    }
 
     return `Bertindaklah sebagai pelamar kerja profesional. Saya ingin membuat surat lamaran kerja dalam format JSON yang valid.
 
 DATA SAYA:
 ${personalInfoString}
-Lampiran (Sertakan di surat): ${attachmentsString}
+Lampiran: ${attachmentsString}
 
 TUJUAN LAMARAN:
 - Posisi: ${targetJob.position || '[Isi Posisi]'}
@@ -277,8 +284,8 @@ TUJUAN LAMARAN:
 ${targetJob.requirements ? `- Syarat/Konteks Khusus: ${targetJob.requirements}` : ''}
 
 INSTRUKSI:
-1. Buat kalimat pembuka yang menarik dan profesional sesuai posisi di atas.
-2. Buat 3 paragraf isi yang relevan dengan posisi tersebut.
+1. ${styleInstruction}
+2. Sesuaikan kalimat dengan posisi yang dilamar.
 3. Gunakan bahasa Indonesia formal (EYD).
 4. Output HANYA JSON (tanpa markdown \`\`\`json) dengan struktur berikut:
 {
@@ -289,9 +296,9 @@ INSTRUKSI:
     "companyName": "${targetJob.company || '...'}"
   },
   "paragraphs": [
-    "Paragraf 1 (Intro & Ketertarikan)",
-    "Paragraf 2 (Skill & Pengalaman yang cocok dengan posisi)",
-    "Paragraf 3 (Soft skill & Harapan)"
+    "Paragraf 1...",
+    "Paragraf 2...",
+    "Paragraf 3 (Optional jika pendek)..."
   ],
   "closing": {
     "intro": "Kalimat penutup yang sopan mengharapkan wawancara."
@@ -427,7 +434,7 @@ INSTRUKSI:
                 </div>
              </div>
 
-             {/* KOLOM KANAN: KELOLA LAMPIRAN (FITUR BARU) */}
+             {/* KOLOM KANAN: KELOLA LAMPIRAN */}
              <div className="space-y-4">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm h-full flex flex-col">
                     <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-3 text-sm">
@@ -480,7 +487,7 @@ INSTRUKSI:
           </div>
         )}
 
-        {/* --- BAGIAN AI --- */}
+        {/* --- BAGIAN AI (UPDATED) --- */}
         {activeTab === 'ai' && (
             <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-2 gap-6">
                <div className="space-y-4">
@@ -537,12 +544,41 @@ INSTRUKSI:
                       </div>
                   </div>
                   
+                  {/* --- CARD INFO LOWONGAN & PILIHAN SURAT --- */}
                   <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
-                      <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16}/> 1. Info Lowongan</h4>
+                      <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16}/> 1. Info Lowongan & Opsi</h4>
                       <div className="space-y-3">
                           <div><label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label><input type="text" placeholder="Contoh: Frontend Developer" value={targetJob.position} onChange={e => setTargetJob({...targetJob, position: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"/></div>
                           <div><label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label><input type="text" placeholder="Contoh: PT Google Indonesia" value={targetJob.company} onChange={e => setTargetJob({...targetJob, company: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"/></div>
-                           <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({...targetJob, requirements: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none"/></div>
+                          
+                          {/* OPSI PANJANG SURAT (BARU) */}
+                          <div className="grid grid-cols-2 gap-2 pt-2">
+                              <div>
+                                  <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Gaya/Panjang Surat</label>
+                                  <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-700 p-1">
+                                      <button 
+                                        onClick={() => setPromptLength('normal')}
+                                        className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'normal' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                      >
+                                          Normal
+                                      </button>
+                                      <button 
+                                        onClick={() => setPromptLength('short')}
+                                        className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'short' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                      >
+                                          Pendek
+                                      </button>
+                                  </div>
+                              </div>
+                              <div>
+                                  <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Info Tambahan</label>
+                                  <div className="flex items-center h-[34px] px-2 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-400">
+                                      {promptLength === 'short' ? 'To-the-point (2 Paragraf)' : 'Standar (3 Paragraf)'}
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({...targetJob, requirements: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none"/></div>
                       </div>
                   </div>
                   
@@ -570,7 +606,6 @@ INSTRUKSI:
         className="bg-white text-black shadow-2xl print:shadow-none relative mx-auto transition-all duration-300"
         style={{ width: '21cm', minHeight: '29.7cm', padding: `${settings.margin}cm`, fontSize: `${settings.fontSize}pt`, lineHeight: settings.lineHeight, fontFamily: '"Times New Roman", Times, serif' }}
       >
-        {/* Style Global untuk Kertas */}
         <style jsx global>{`
             .editable-highlight { @apply cursor-pointer relative rounded border border-dashed border-zinc-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 px-1 -mx-1 py-0.5; }
             .editable-highlight:hover::after { content: '✎'; @apply absolute -top-2 -right-2 text-[8px] bg-blue-500 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm pointer-events-none z-10; }
@@ -683,7 +718,6 @@ INSTRUKSI:
                          </li>
                     ))}
                 </ol>
-                {/* Note: Menambah lampiran di mode kertas akan menambahnya dalam keadaan tercentang */}
                 {isEditMode && <button onClick={() => addItem('attachment')} className="add-btn"><PlusCircle size={14} /> Tambah Lampiran</button>}
 
                 {/* CLOSING PARAGRAPH */}
