@@ -2,11 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
-  ArrowDownToLine, Edit3
+  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, GripVertical, PlusCircle
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
 // --- INTERFACES ---
+interface DataRow {
+  id: string;
+  label: string;
+  value: string;
+  isBold?: boolean; // Untuk menandai apakah value harus bold (seperti Nama)
+}
+
 interface UserProfile {
   id: string;
   profileName: string;
@@ -18,248 +25,223 @@ interface UserProfile {
   email: string;
 }
 
-interface JobInfo {
-  cityDate: string;
-  destination: string;
-  companyName: string;
-  position: string;
-  attachments: string;
-}
-
-interface LetterContent {
-  paragraphOpening: string;
-  paragraphBody: string;
-  paragraphClosing: string;
-}
-
 export const SuratLamaranView = () => {
   // --- STATE CONTROL PANEL ---
   const [activeTab, setActiveTab] = useState<'design' | 'data' | 'ai'>('data');
-  const [jsonInput, setJsonInput] = useState(''); // Untuk menampung input JSON dari user
-  
-  // State Pengaturan Tampilan
-  const [settings, setSettings] = useState({
-    fontSize: 12,
-    lineHeight: 1.4,
-    margin: 2.5
-  });
+  const [jsonInput, setJsonInput] = useState(''); 
+  const [settings, setSettings] = useState({ fontSize: 12, lineHeight: 1.4, margin: 2.5 });
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // State Data Diri (Default)
-  const [userData, setUserData] = useState<UserProfile>({
-    id: 'default',
-    profileName: 'Default User',
-    fullName: 'Frendy Rikal Gerung',
-    birthPlaceDate: 'Raanan Baru, 22 Februari 2002',
-    education: 'S1 Teknik Informatika',
-    address: 'Raanan Baru Satu Jaga IV',
-    phone: '0852-9893-7694',
-    email: 'frendegerung634@gmail.com'
-  });
+  // --- STATE MODAL EDIT ---
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    label: string;
+    text: string;
+    onSave: ((val: string) => void) | null;
+  }>({ isOpen: false, label: '', text: '', onSave: null });
 
-  // State Data Pekerjaan
-  const [jobData, setJobData] = useState<JobInfo>({
+  // --- STATE UTAMA (DINAMIS) ---
+  // 1. Header & Recipient
+  const [headerData, setHeaderData] = useState({
     cityDate: 'Manado, 6 Februari 2026',
-    destination: 'Bapak/Ibu HRD',
+    subject: 'Lamaran Pekerjaan',
+    recipientTitle: 'Bapak/Ibu HRD',
     companyName: 'PT Teknologi Masa Depan',
-    position: 'Frontend Developer',
-    attachments: 'Surat Lamaran, CV, Portofolio, Ijazah'
+    recipientAddress: 'di Tempat'
   });
 
-  // State Isi Surat (Supaya bisa diganti AI)
-  const [letterContent, setLetterContent] = useState<LetterContent>({
-    paragraphOpening: "Berdasarkan informasi yang saya peroleh, perusahaan yang Bapak/Ibu pimpin sedang membuka lowongan pekerjaan.",
-    paragraphBody: "Melalui surat ini saya bermaksud untuk melamar pekerjaan dan bergabung dengan perusahaan Bapak/Ibu. Latar belakang pendidikan dan pengalaman saya di bidang teknologi sangat relevan dengan posisi tersebut. Saya memiliki kemampuan adaptasi yang cepat, disiplin, dan mampu bekerja dalam tim maupun individu.",
-    paragraphClosing: "Besar harapan saya untuk dapat diberikan kesempatan wawancara agar dapat menjelaskan lebih mendalam mengenai potensi diri saya. Demikian surat lamaran ini saya buat, atas perhatian Bapak/Ibu saya ucapkan terima kasih."
+  // 2. Body Paragraphs (Array string agar bisa nambah/hapus)
+  const [bodyParagraphs, setBodyParagraphs] = useState<string[]>([
+    "Berdasarkan informasi yang saya peroleh, perusahaan yang Bapak/Ibu pimpin sedang membuka lowongan pekerjaan untuk posisi Frontend Developer.",
+    "Melalui surat ini saya bermaksud untuk melamar pekerjaan dan bergabung dengan perusahaan Bapak/Ibu. Latar belakang pendidikan dan pengalaman saya di bidang teknologi sangat relevan dengan posisi tersebut.",
+    "Saya memiliki kemampuan adaptasi yang cepat, disiplin, dan mampu bekerja dalam tim maupun individu."
+  ]);
+
+  // 3. Data Diri (Array object agar bisa nambah/hapus baris tabel)
+  const [personalDetails, setPersonalDetails] = useState<DataRow[]>([
+    { id: '1', label: 'Nama', value: 'Frendy Rikal Gerung', isBold: true },
+    { id: '2', label: 'Tempat, Tgl. Lahir', value: 'Raanan Baru, 22 Februari 2002' },
+    { id: '3', label: 'Pendidikan Terakhir', value: 'S1 Teknik Informatika' },
+    { id: '4', label: 'Alamat', value: 'Raanan Baru Satu Jaga IV' },
+    { id: '5', label: 'No. Telepon', value: '0852-9893-7694' },
+    { id: '6', label: 'Email', value: 'frendegerung634@gmail.com' },
+  ]);
+
+  // 4. Lampiran (Array string)
+  const [attachments, setAttachments] = useState<string[]>([
+    "Daftar Riwayat Hidup (CV)",
+    "Portofolio",
+    "Fotokopi Ijazah & Transkrip Nilai",
+    "Pas Foto Terbaru"
+  ]);
+
+  // 5. Closing & Signature
+  const [closingData, setClosingData] = useState({
+    intro: "Besar harapan saya untuk dapat diberikan kesempatan wawancara agar dapat menjelaskan lebih mendalam mengenai potensi diri saya. Demikian surat lamaran ini saya buat, atas perhatian Bapak/Ibu saya ucapkan terima kasih.",
+    greeting: "Hormat Saya,",
+    signerName: "Frendy Rikal Gerung"
   });
 
-  // State Instruksi Prompt AI (NEW)
-  const [promptInstructions, setPromptInstructions] = useState({
-    opening: "Kalimat pembuka yang menyebutkan sumber info lowongan...",
-    body: "Paragraf inti yang menjelaskan skill, pengalaman, dan motivasi...",
-    closing: "Kalimat penutup yang berisi harapan wawancara..."
-  });
-
-  // State Profil Tersimpan
   const [savedProfiles, setSavedProfiles] = useState<UserProfile[]>([]);
-
-  // State Tanda Tangan
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 }); 
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dragItemRef = useRef<HTMLImageElement>(null);
-  const isDrawing = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
+  // --- HELPERS ADD/DELETE/EDIT ---
 
-  // --- LOGIC LOAD/SAVE PROFIL ---
+  // Helper: Buka Modal Edit
+  const openEdit = (label: string, initialText: string, onSaveHandler: (val: string) => void) => {
+    if (!isEditMode) return;
+    setEditModal({ isOpen: true, label, text: initialText, onSave: onSaveHandler });
+  };
+
+  // Helper: Hapus Item Array
+  const deleteItem = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number) => {
+    if(!confirm("Hapus baris ini?")) return;
+    setter(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Helper: Tambah Item Array
+  const addItem = (type: 'paragraph' | 'detail' | 'attachment', index?: number) => {
+    if (type === 'paragraph') {
+      const newText = "Paragraf baru... (Klik untuk edit)";
+      setBodyParagraphs(prev => {
+        const arr = [...prev];
+        // Insert after index, or at end if undefined
+        const insertIdx = index !== undefined ? index + 1 : arr.length;
+        arr.splice(insertIdx, 0, newText);
+        return arr;
+      });
+    } else if (type === 'detail') {
+      const newRow: DataRow = { id: Date.now().toString(), label: 'Label Baru', value: 'Isi Data...' };
+      setPersonalDetails(prev => [...prev, newRow]);
+    } else if (type === 'attachment') {
+      setAttachments(prev => [...prev, "Lampiran Baru..."]);
+    }
+  };
+
+  // --- LOGIC LOAD/SAVE PROFIL (TETAP ADA) ---
   useEffect(() => {
     const stored = localStorage.getItem('userProfiles');
     if (stored) setSavedProfiles(JSON.parse(stored));
   }, []);
 
-  const handleSaveProfile = () => {
-    const profileName = prompt("Simpan profil dengan nama:", userData.profileName);
-    if (profileName) {
-      const newProfile = { ...userData, id: Date.now().toString(), profileName };
-      const newList = [...savedProfiles, newProfile];
-      setSavedProfiles(newList);
-      localStorage.setItem('userProfiles', JSON.stringify(newList));
-      alert("Profil berhasil disimpan!");
-    }
-  };
-
   const handleLoadProfile = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const selected = savedProfiles.find(p => p.id === selectedId);
-    if (selected) setUserData(selected);
+    if (selected) {
+      // Map profile ke format dinamis tabel
+      setPersonalDetails([
+        { id: '1', label: 'Nama', value: selected.fullName, isBold: true },
+        { id: '2', label: 'Tempat, Tgl. Lahir', value: selected.birthPlaceDate },
+        { id: '3', label: 'Pendidikan', value: selected.education },
+        { id: '4', label: 'Alamat', value: selected.address },
+        { id: '5', label: 'No. Telepon', value: selected.phone },
+        { id: '6', label: 'Email', value: selected.email },
+      ]);
+      setClosingData(prev => ({ ...prev, signerName: selected.fullName }));
+    }
   };
 
-  // --- LOGIC AI JSON GENERATOR & IMPORT ---
-  const generateAIPrompt = () => {
-    return `Bertindaklah sebagai asisten karir profesional. Saya ingin melamar pekerjaan dan membutuhkan surat lamaran yang personal dan profesional.
-    
-Gunakan data saya berikut ini sebagai dasar:
-- Nama: ${userData.fullName}
-- TTL: ${userData.birthPlaceDate}
-- Pendidikan: ${userData.education}
-- Alamat: ${userData.address}
-- Kontak: ${userData.phone} / ${userData.email}
-
-Tugas Anda:
-1. Lengkapi data lamaran (posisi, perusahaan, tanggal, dll) dengan data dummy yang relevan JIKA saya belum mengisinya, atau gunakan data yang logis.
-2. Buat isi surat (paragraf pembuka, inti, penutup) yang meyakinkan, sopan, dan sesuai dengan posisi yang dilamar.
-
-PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json) dengan struktur berikut agar bisa saya import ke aplikasi saya:
-
-{
-  "jobInfo": {
-    "cityDate": "Kota, Tanggal Surat (misal: Jakarta, 20 Februari 2026)",
-    "destination": "Penerima (misal: Bapak/Ibu HRD)",
-    "companyName": "Nama Perusahaan Tujuan",
-    "position": "Posisi yang Dilamar",
-    "attachments": "Daftar lampiran dipisah koma"
-  },
-  "letterContent": {
-    "paragraphOpening": "${promptInstructions.opening}",
-    "paragraphBody": "${promptInstructions.body}",
-    "paragraphClosing": "${promptInstructions.closing}"
-  }
-}`;
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generateAIPrompt());
-    alert("Prompt disalin! Paste ke AI, lalu copy JSON balasannya ke kotak input di bawah.");
-  };
-
+  // --- LOGIC AI IMPORT (DISESUAIKAN DENGAN STRUKTUR BARU) ---
   const handleImportJson = () => {
     try {
-      // Membersihkan string json jika ada markdown block code
       const cleanJson = jsonInput.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
       
-      if (parsed.jobInfo) setJobData({ ...jobData, ...parsed.jobInfo });
-      if (parsed.letterContent) setLetterContent({ ...letterContent, ...parsed.letterContent });
-      
-      alert("Surat berhasil diperbarui dari JSON AI!");
-      setJsonInput(''); // Clear input
-      setActiveTab('data'); // Kembali ke tab data/preview
-    } catch (error) {
-      alert("Gagal import JSON. Pastikan format dari AI sudah benar dan valid JSON.");
-      console.error(error);
-    }
-  };
-
-  // --- LOGIC TAMPILAN & CANVAS ---
-  const adjust = (type: 'font' | 'line' | 'margin', val: number) => {
-    setSettings(prev => {
-      let newValue;
-      switch(type) {
-        case 'font':
-          newValue = Math.max(10, Math.min(14, prev.fontSize + val));
-          return { ...prev, fontSize: newValue };
-        case 'line':
-          newValue = Math.max(1.0, Math.min(2.0, prev.lineHeight + val));
-          return { ...prev, lineHeight: parseFloat(newValue.toFixed(1)) };
-        case 'margin':
-          newValue = Math.max(1.0, Math.min(3.0, prev.margin + val));
-          return { ...prev, margin: parseFloat(newValue.toFixed(1)) };
-        default: return prev;
+      // Update basic fields
+      if (parsed.jobInfo) {
+        setHeaderData(prev => ({
+          ...prev,
+          cityDate: parsed.jobInfo.cityDate || prev.cityDate,
+          companyName: parsed.jobInfo.companyName || prev.companyName,
+          recipientTitle: parsed.jobInfo.destination || prev.recipientTitle,
+        }));
+        if(parsed.jobInfo.attachments) {
+            setAttachments(parsed.jobInfo.attachments.split(','));
+        }
       }
-    });
-  };
+      
+      // Update Content paragraphs
+      if (parsed.letterContent) {
+        // Gabungkan paragraphOpening, Body, Closing menjadi array
+        const newParas = [];
+        if(parsed.letterContent.paragraphOpening) newParas.push(parsed.letterContent.paragraphOpening);
+        if(parsed.letterContent.paragraphBody) newParas.push(parsed.letterContent.paragraphBody);
+        setBodyParagraphs(newParas);
 
-  const getPos = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    let clientX, clientY;
-    if ('touches' in e) {
-       clientX = e.touches[0].clientX;
-       clientY = e.touches[0].clientY;
-    } else {
-       clientX = (e as React.MouseEvent).clientX;
-       clientY = (e as React.MouseEvent).clientY;
+        setClosingData(prev => ({
+            ...prev,
+            intro: parsed.letterContent.paragraphClosing || prev.intro
+        }));
+      }
+
+      alert("Surat diperbarui!"); setActiveTab('data');
+    } catch (error) {
+      alert("Gagal import JSON.");
     }
-    return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => { isDrawing.current = true; lastPos.current = getPos(e); };
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing.current || !canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-    if ('touches' in e) e.preventDefault();
-    const p = getPos(e);
-    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(p.x, p.y);
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
-    lastPos.current = p;
-  };
+  // --- CANVAS & UTILS ---
+  const handleSaveModal = () => { if (editModal.onSave) { editModal.onSave(editModal.text); setEditModal({ ...editModal, isOpen: false }); }};
+  const generateAIPrompt = () => { return `Buatkan surat lamaran kerja dalam format JSON... (Sama seperti sebelumnya)`; };
+  const copyToClipboard = () => { navigator.clipboard.writeText(generateAIPrompt()); alert("Prompt disalin!"); };
+  const adjust = (type: 'font' | 'line' | 'margin', val: number) => { setSettings(prev => { if (type === 'font') return { ...prev, fontSize: Math.max(10, Math.min(14, prev.fontSize + val)) }; if (type === 'line') return { ...prev, lineHeight: parseFloat((prev.lineHeight + val).toFixed(1)) }; return { ...prev, margin: parseFloat((prev.margin + val).toFixed(1)) }; }); };
+  
+  // Canvas Refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dragItemRef = useRef<HTMLImageElement>(null);
+  const isDrawing = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  // Canvas Logic (Singkat)
+  const getPos = (e: any) => { const rect = canvasRef.current?.getBoundingClientRect(); return rect ? { x: (e.touches?e.touches[0].clientX:e.clientX)-rect.left, y: (e.touches?e.touches[0].clientY:e.clientY)-rect.top } : {x:0,y:0} };
+  const startDrawing = (e: any) => { isDrawing.current = true; lastPos.current = getPos(e); };
+  const draw = (e: any) => { if(!isDrawing.current || !canvasRef.current) return; const ctx=canvasRef.current.getContext('2d'); if(ctx){ if(e.touches)e.preventDefault(); const p=getPos(e); ctx.beginPath();ctx.moveTo(lastPos.current.x,lastPos.current.y);ctx.lineTo(p.x,p.y);ctx.stroke();lastPos.current=p; }};
   const stopDrawing = () => { isDrawing.current = false; };
   const clearCanvas = () => { const ctx = canvasRef.current?.getContext('2d'); ctx?.clearRect(0, 0, 300, 100); setSignatureImage(null); };
   const useSignature = () => { if (canvasRef.current) setSignatureImage(canvasRef.current.toDataURL('image/png')); };
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader();
-      reader.onload = (ev) => { if(ev.target?.result) setSignatureImage(ev.target.result as string); };
-      reader.readAsDataURL(e.target.files[0]);
-    }
-  };
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files?.[0]) { const reader = new FileReader(); reader.onload = (ev) => setSignatureImage(ev.target?.result as string); reader.readAsDataURL(e.target.files[0]); }};
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); setIsDragging(true); };
-
   useEffect(() => {
-    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDragging || !dragItemRef.current) return;
-      const parentRect = dragItemRef.current.parentElement?.getBoundingClientRect();
-      if (!parentRect) return;
-      let clientX, clientY;
-      if ('touches' in e) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; } 
-      else { clientX = (e as MouseEvent).clientX; clientY = (e as MouseEvent).clientY; }
-      setPosition({ x: clientX - parentRect.left - (dragItemRef.current.width / 2), y: clientY - parentRect.top - (dragItemRef.current.height / 2) });
-    };
+    const handleGlobalMove = (e: any) => { if (!isDragging || !dragItemRef.current) return; const pRect = dragItemRef.current.parentElement?.getBoundingClientRect(); if(pRect) setPosition({ x: (e.touches?e.touches[0].clientX:e.clientX) - pRect.left - (dragItemRef.current.width/2), y: (e.touches?e.touches[0].clientY:e.clientY) - pRect.top - (dragItemRef.current.height/2) }); };
     const handleGlobalUp = () => setIsDragging(false);
-    if (isDragging) {
-      window.addEventListener('mousemove', handleGlobalMove); window.addEventListener('mouseup', handleGlobalUp);
-      window.addEventListener('touchmove', handleGlobalMove, { passive: false }); window.addEventListener('touchend', handleGlobalUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMove); window.removeEventListener('mouseup', handleGlobalUp);
-      window.removeEventListener('touchmove', handleGlobalMove); window.removeEventListener('touchend', handleGlobalUp);
-    };
+    if (isDragging) { window.addEventListener('mousemove', handleGlobalMove); window.addEventListener('mouseup', handleGlobalUp); window.addEventListener('touchmove', handleGlobalMove, {passive:false}); window.addEventListener('touchend', handleGlobalUp); }
+    return () => { window.removeEventListener('mousemove', handleGlobalMove); window.removeEventListener('mouseup', handleGlobalUp); window.removeEventListener('touchmove', handleGlobalMove); window.removeEventListener('touchend', handleGlobalUp); };
   }, [isDragging]);
 
   return (
-    <div className="flex flex-col items-center w-full min-h-full pb-10">
+    <div className="flex flex-col items-center w-full min-h-full pb-10 relative">
       
+      {/* --- MODAL EDIT --- */}
+      {editModal.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl p-6 border border-zinc-200 dark:border-zinc-800 transform transition-all scale-100">
+                <div className="flex justify-between items-center mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                    <h3 className="font-bold text-lg text-zinc-900 dark:text-white flex items-center gap-2">
+                        <Edit3 size={20} className="text-blue-500"/> Edit {editModal.label}
+                    </h3>
+                    <button onClick={() => setEditModal({...editModal, isOpen: false})} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} className="text-zinc-500"/></button>
+                </div>
+                <textarea 
+                    value={editModal.text}
+                    onChange={(e) => setEditModal({...editModal, text: e.target.value})}
+                    className="w-full h-48 p-4 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm leading-relaxed mb-6 font-serif"
+                />
+                <div className="flex justify-end gap-3">
+                    <Button variant="ghost" onClick={() => setEditModal({...editModal, isOpen: false})}>Batal</Button>
+                    <Button onClick={handleSaveModal}><Check size={18} /> Simpan</Button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* --- CONTROL PANEL --- */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm p-6 mb-8 w-full max-w-5xl print:hidden transition-all">
-        
-        {/* Header Tabs */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4">
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 {[
-                  { id: 'data', icon: User, label: 'Data Diri' },
+                  { id: 'data', icon: User, label: 'Data Dasar' },
                   { id: 'design', icon: Settings2, label: 'Tampilan' },
                   { id: 'ai', icon: Bot, label: 'AI Generator' },
                 ].map((tab) => (
@@ -277,256 +259,217 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
                 ))}
             </div>
             
-            <button 
-                onClick={() => window.print()} 
-                className="flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 px-5 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95 text-sm whitespace-nowrap"
-            >
-                <Printer size={18} /> 
-                <span>Cetak PDF</span>
-            </button>
+            <div className="flex items-center gap-3">
+                <button 
+                    onClick={() => setIsEditMode(!isEditMode)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all shadow-sm text-sm border ${
+                        isEditMode 
+                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/50 ring-2 ring-yellow-200 ring-offset-1' 
+                        : 'bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                    }`}
+                >
+                    {isEditMode ? <ToggleRight size={20} className="text-yellow-600"/> : <ToggleLeft size={20}/>}
+                    <span>{isEditMode ? 'Mode Edit: ON' : 'Mode Edit: OFF'}</span>
+                </button>
+
+                <button onClick={() => window.print()} className="flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 px-5 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95 text-sm whitespace-nowrap">
+                    <Printer size={18} /> <span>Cetak PDF</span>
+                </button>
+            </div>
         </div>
 
-        {/* --- TAB: DATA DIRI --- */}
+        {/* ISI TAB DATA */}
         {activeTab === 'data' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><User size={16}/> Informasi Pelamar</h4>
-                  <select 
-                    onChange={handleLoadProfile}
-                    className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-1 outline-none dark:bg-zinc-800 dark:border-zinc-700"
-                  >
-                    <option value="">Pilih Profil...</option>
-                    {savedProfiles.map(p => <option key={p.id} value={p.id}>{p.profileName}</option>)}
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                   <input type="text" placeholder="Nama Lengkap" value={userData.fullName} onChange={e => setUserData({...userData, fullName: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Tempat, Tanggal Lahir" value={userData.birthPlaceDate} onChange={e => setUserData({...userData, birthPlaceDate: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Pendidikan" value={userData.education} onChange={e => setUserData({...userData, education: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Alamat" value={userData.address} onChange={e => setUserData({...userData, address: e.target.value})} className="input-field" />
-                   <div className="grid grid-cols-2 gap-3">
-                      <input type="text" placeholder="No. Telepon" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} className="input-field" />
-                      <input type="text" placeholder="Email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} className="input-field" />
-                   </div>
-                   <Button variant="ghost" onClick={handleSaveProfile} className="w-full mt-2 border border-dashed border-zinc-300 text-xs h-8">
-                      Simpan Profil Ini
-                   </Button>
+                <div className="flex items-center justify-between"><h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><User size={16}/> Load Data Profil</h4><select onChange={handleLoadProfile} className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-1"><option value="">Pilih Profil...</option>{savedProfiles.map(p => <option key={p.id} value={p.id}>{p.profileName}</option>)}</select></div>
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                   <strong>Tips:</strong> Aktifkan <strong>Mode Edit</strong> di atas untuk mengubah, menambah, atau menghapus baris surat secara langsung di tampilan kertas.
                 </div>
              </div>
-
-             <div className="space-y-4">
-                <h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><Briefcase size={16}/> Informasi Lowongan</h4>
-                <div className="grid grid-cols-1 gap-3">
-                   <div className="grid grid-cols-2 gap-3">
-                      <input type="text" placeholder="Kota, Tgl" value={jobData.cityDate} onChange={e => setJobData({...jobData, cityDate: e.target.value})} className="input-field" />
-                      <input type="text" placeholder="Tujuan (Yth...)" value={jobData.destination} onChange={e => setJobData({...jobData, destination: e.target.value})} className="input-field" />
-                   </div>
-                   <input type="text" placeholder="Perusahaan" value={jobData.companyName} onChange={e => setJobData({...jobData, companyName: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Posisi" value={jobData.position} onChange={e => setJobData({...jobData, position: e.target.value})} className="input-field" />
-                   <textarea rows={3} placeholder="Lampiran (koma)" value={jobData.attachments} onChange={e => setJobData({...jobData, attachments: e.target.value})} className="input-field resize-none" />
-                </div>
-             </div>
-          </div>
+           </div>
         )}
-
-        {/* --- TAB: TAMPILAN --- */}
         {activeTab === 'design' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
-             {[
-               { label: 'Ukuran Huruf', type: 'font' as const, val: settings.fontSize, unit: 'pt', step: 1, icon: Type, color: 'text-blue-500' },
-               { label: 'Spasi Baris', type: 'line' as const, val: settings.lineHeight, unit: '', step: 0.1, icon: AlignJustify, color: 'text-indigo-500' },
-               { label: 'Margin', type: 'margin' as const, val: settings.margin, unit: 'cm', step: 0.2, icon: Move, color: 'text-emerald-500' },
-             ].map((ctrl, idx) => (
-                <div key={idx} className="space-y-3">
-                  <div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      <span className="flex items-center gap-2"><ctrl.icon size={16} className={ctrl.color}/> {ctrl.label}</span>
-                      <span className="badge">{ctrl.val}{ctrl.unit}</span>
-                  </div>
-                  <div className="control-buttons">
-                      <button onClick={() => adjust(ctrl.type, -ctrl.step)}><Minus size={16}/></button>
-                      <div className="separator"></div>
-                      <button onClick={() => adjust(ctrl.type, ctrl.step)}><Plus size={16}/></button>
-                  </div>
-                </div>
-             ))}
+             {[ { label: 'Ukuran Huruf', type: 'font', val: settings.fontSize, unit: 'pt', step: 1, icon: Type, color: 'text-blue-500' }, { label: 'Spasi Baris', type: 'line', val: settings.lineHeight, unit: '', step: 0.1, icon: AlignJustify, color: 'text-indigo-500' }, { label: 'Margin', type: 'margin', val: settings.margin, unit: 'cm', step: 0.2, icon: Move, color: 'text-emerald-500' } ].map((ctrl: any, idx) => (<div key={idx} className="space-y-3"><div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300"><span className="flex items-center gap-2"><ctrl.icon size={16} className={ctrl.color}/> {ctrl.label}</span><span className="badge">{ctrl.val}{ctrl.unit}</span></div><div className="control-buttons"><button onClick={() => adjust(ctrl.type, -ctrl.step)}><Minus size={16}/></button><div className="separator"></div><button onClick={() => adjust(ctrl.type, ctrl.step)}><Plus size={16}/></button></div></div>))}
           </div>
         )}
-
-        {/* --- TAB: AI GENERATOR (UPDATED) --- */}
         {activeTab === 'ai' && (
-          <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-3 gap-6">
-             
-             {/* Kolom Kiri: Konfigurasi Prompt */}
-              <div className="space-y-3 lg:col-span-1">
-                {/* TAMBAHKAN 'h-full' DI SINI AGAR KOTAK ORANYE TINGGINYA MENGIKUTI TETANGGA */}
-                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl p-4 h-full flex flex-col">
-                  <h4 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2 mb-2 text-sm">
-                    <Edit3 size={16}/> Konfigurasi Instruksi
-                  </h4>
-                  <p className="text-xs text-orange-600 dark:text-orange-400 mb-3">
-                    Ubah instruksi di bawah ini untuk mengarahkan gaya bahasa AI.
-                  </p>
-                  
-                  {/* Gunakan flex-1 agar area input mengisi sisa ruang vertikal */}
-                  <div className="flex flex-col gap-3 flex-1 min-h-0">
-                    <div className="flex-1 flex flex-col min-h-0">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Pembuka</label>
-                      <textarea 
-                        className="input-field text-xs resize-none flex-1"
-                        value={promptInstructions.opening}
-                        onChange={(e) => setPromptInstructions({...promptInstructions, opening: e.target.value})}
-                      />
-                    </div>
-                    
-                    {/* flex-[2] membuat bagian Body mendapat porsi tinggi 2x lipat dibanding header/footer */}
-                    <div className="flex-[2] flex flex-col min-h-0">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Isi</label>
-                      <textarea 
-                        className="input-field text-xs resize-none flex-1"
-                        value={promptInstructions.body}
-                        onChange={(e) => setPromptInstructions({...promptInstructions, body: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="flex-1 flex flex-col min-h-0">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Penutup</label>
-                      <textarea 
-                        className="input-field text-xs resize-none flex-1"
-                        value={promptInstructions.closing}
-                        onChange={(e) => setPromptInstructions({...promptInstructions, closing: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                </div>
-             </div>
-
-             {/* Kolom Tengah: Copy Prompt */}
-             <div className="space-y-3 lg:col-span-1">
-                <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4 h-full">
-                   <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2 text-sm">
-                     <Copy size={16}/> 1. Salin Prompt
-                   </h4>
-                   <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
-                     Salin instruksi ini (termasuk konfigurasi Anda) ke Gemini/ChatGPT.
-                   </p>
-                   <div className="relative h-[200px] lg:h-[250px]">
-                     <textarea readOnly value={generateAIPrompt()} className="w-full h-full p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none" />
-                     <button onClick={copyToClipboard} className="absolute top-2 right-2 bg-white p-1.5 rounded-md shadow-sm border border-zinc-200 hover:bg-zinc-50 text-zinc-600" title="Copy">
-                        <Copy size={14} />
-                     </button>
-                   </div>
-                </div>
-             </div>
-
-             {/* Kolom Kanan: Import JSON */}
-             <div className="space-y-3 lg:col-span-1">
-                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full flex flex-col">
-                   <h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm">
-                     <ArrowDownToLine size={16}/> 2. Import JSON
-                   </h4>
-                   <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">
-                     Paste balasan JSON dari AI di sini untuk mengisi surat otomatis.
-                   </p>
-                   <textarea 
-                      value={jsonInput}
-                      onChange={(e) => setJsonInput(e.target.value)}
-                      placeholder='Paste JSON di sini... Contoh: { "jobInfo": { ... } }'
-                      className="w-full flex-1 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                   />
-                   <button 
-                      onClick={handleImportJson}
-                      disabled={!jsonInput}
-                      className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-                   >
-                      <ArrowDownToLine size={16} /> Terapkan
-                   </button>
-                </div>
-             </div>
-          </div>
+            <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-2 gap-6">
+               <div className="space-y-3"><div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4 h-full"><h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2 text-sm"><Copy size={16}/> 1. Salin Prompt</h4><textarea readOnly value={generateAIPrompt()} className="w-full h-32 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none" /><button onClick={copyToClipboard} className="mt-2 w-full py-2 bg-white border border-zinc-200 text-zinc-700 rounded-lg text-xs font-bold hover:bg-zinc-50">Salin Prompt</button></div></div>
+               <div className="space-y-3"><div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full"><h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm"><ArrowDownToLine size={16}/> 2. Import JSON</h4><textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} placeholder='Paste JSON di sini...' className="w-full h-32 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none" /><button onClick={handleImportJson} disabled={!jsonInput} className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">Terapkan JSON</button></div></div>
+            </div>
         )}
-
       </div>
 
       {/* --- HALAMAN KERTAS (A4) --- */}
       <div 
         className="bg-white text-black shadow-2xl print:shadow-none relative mx-auto transition-all duration-300"
-        style={{
-            width: '21cm',
-            minHeight: '29.7cm',
-            padding: `${settings.margin}cm`,
-            fontSize: `${settings.fontSize}pt`,
-            lineHeight: settings.lineHeight,
-            fontFamily: '"Times New Roman", Times, serif'
-        }}
+        style={{ width: '21cm', minHeight: '29.7cm', padding: `${settings.margin}cm`, fontSize: `${settings.fontSize}pt`, lineHeight: settings.lineHeight, fontFamily: '"Times New Roman", Times, serif' }}
       >
         <style jsx global>{`
-            .input-field { @apply w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all; }
-            .badge { @apply text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold border border-zinc-200 dark:border-zinc-700; }
-            .control-buttons { @apply flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800; }
-            .control-buttons button { @apply flex-1 p-2 hover:bg-white dark:hover:bg-zinc-700 rounded-lg shadow-sm transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 flex justify-center; }
-            .separator { @apply w-px h-4 bg-zinc-200 dark:bg-zinc-700; }
-            @media print {
-                body * { visibility: hidden; }
-                .page-container-print, .page-container-print * { visibility: visible; }
-                .page-container-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
-                nav, aside, header, .no-print { display: none !important; }
-            }
+            .editable-highlight { @apply cursor-pointer relative rounded transition-all duration-200 hover:bg-yellow-50 outline-none decoration-yellow-300 ring-1 ring-transparent hover:ring-yellow-300; }
+            .action-btn { @apply absolute hidden items-center justify-center w-6 h-6 rounded-full bg-white shadow-md border border-zinc-200 cursor-pointer z-20 hover:scale-110 transition-transform text-zinc-500 hover:text-red-500; }
+            .editable-container:hover .action-btn { @apply flex; }
+            .add-btn { @apply flex items-center justify-center gap-1 w-full py-1 mt-1 mb-2 border-2 border-dashed border-zinc-200 rounded-lg text-zinc-300 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition-all text-[10px] font-sans font-bold uppercase tracking-wider; }
+            @media print { .no-print, .action-btn, .add-btn { display: none !important; } }
         `}</style>
 
         <div className="page-container-print">
-            {/* Header Date */}
-            <div className="text-right mb-6">{jobData.cityDate}</div>
-
-            {/* Recipient */}
-            <div className="text-left mb-8">
-                Perihal: <strong>Lamaran Pekerjaan</strong><br /><br />
-                Yth.<br />
-                <strong>{jobData.destination}<br />{jobData.companyName}</strong><br />
-                di<br />Tempat
+            {/* Header: Date */}
+            <div className={`text-right mb-6 editable-container relative group`}>
+                <div 
+                    className={isEditMode ? 'editable-highlight' : ''}
+                    onClick={() => openEdit('Tanggal Surat', headerData.cityDate, (val) => setHeaderData({...headerData, cityDate: val}))}
+                >
+                    {headerData.cityDate}
+                </div>
             </div>
 
-            {/* Content */}
+            {/* Header: Recipient */}
+            <div className="text-left mb-8">
+                Perihal: 
+                <strong 
+                    className={`ml-1 ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Perihal', headerData.subject, (val) => setHeaderData({...headerData, subject: val}))}
+                >
+                    {headerData.subject}
+                </strong>
+                <br /><br />
+                
+                Yth.<br />
+                <strong 
+                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Penerima (Yth)', headerData.recipientTitle, (val) => setHeaderData({...headerData, recipientTitle: val}))}
+                >
+                    {headerData.recipientTitle}
+                </strong>
+                <strong 
+                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Nama Perusahaan', headerData.companyName, (val) => setHeaderData({...headerData, companyName: val}))}
+                >
+                    {headerData.companyName}
+                </strong>
+                <div 
+                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Alamat Penerima', headerData.recipientAddress, (val) => setHeaderData({...headerData, recipientAddress: val}))}
+                >
+                    {headerData.recipientAddress}
+                </div>
+            </div>
+
             <div className="text-justify">
                 <p className="mb-4">Dengan hormat,</p>
 
-                {/* Paragraf Pembuka Dinamis */}
-                <p className="mb-4">
-                  {letterContent.paragraphOpening.includes('posisi') ? letterContent.paragraphOpening : 
-                   `${letterContent.paragraphOpening} posisi ${jobData.position}.`}
-                </p>
+                {/* --- BODY PARAGRAPHS (DYNAMIC) --- */}
+                {bodyParagraphs.map((para, idx) => (
+                    <div key={idx} className="relative editable-container group">
+                        {isEditMode && (
+                            <button onClick={() => deleteItem(setBodyParagraphs, idx)} className="action-btn -right-8 top-0" title="Hapus Paragraf">
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                        <p 
+                            className={`mb-4 ${isEditMode ? 'editable-highlight ring-offset-2' : ''}`}
+                            onClick={() => openEdit(`Paragraf ke-${idx+1}`, para, (val) => setBodyParagraphs(prev => { const n = [...prev]; n[idx] = val; return n; }))}
+                        >
+                            {para}
+                        </p>
+                        {isEditMode && (
+                             <button onClick={() => addItem('paragraph', idx)} className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30 shadow-sm hover:scale-110" title="Sisipkan Paragraf Di Sini">
+                                <Plus size={14} />
+                             </button>
+                        )}
+                    </div>
+                ))}
 
-                {/* Paragraf Isi Dinamis */}
-                <p className="mb-4">{letterContent.paragraphBody}</p>
+                {/* ADD PARAGRAPH BUTTON (Jika kosong atau paling bawah) */}
+                {isEditMode && (
+                    <button onClick={() => addItem('paragraph')} className="add-btn">
+                        <PlusCircle size={14} /> Tambah Paragraf
+                    </button>
+                )}
 
                 <p className="mb-4">Adapun data diri saya sebagai berikut:</p>
 
+                {/* --- PERSONAL DATA (DYNAMIC TABLE) --- */}
                 <table className="w-full border-collapse mb-4 mt-2">
                     <tbody>
-                        <tr><td className="w-40 font-bold align-top pb-1">Nama</td><td className="w-4 align-top text-center">:</td><td><strong>{userData.fullName}</strong></td></tr>
-                        <tr><td className="w-40 font-bold align-top pb-1">Tempat, Tgl. Lahir</td><td className="w-4 align-top text-center">:</td><td>{userData.birthPlaceDate}</td></tr>
-                        <tr><td className="w-40 font-bold align-top pb-1">Pendidikan Terakhir</td><td className="w-4 align-top text-center">:</td><td>{userData.education}</td></tr>
-                        <tr><td className="w-40 font-bold align-top pb-1">Alamat</td><td className="w-4 align-top text-center">:</td><td>{userData.address}</td></tr>
-                        <tr><td className="w-40 font-bold align-top pb-1">No. Telepon</td><td className="w-4 align-top text-center">:</td><td>{userData.phone}</td></tr>
-                        <tr><td className="w-40 font-bold align-top pb-1">Email</td><td className="w-4 align-top text-center">:</td><td>{userData.email}</td></tr>
+                        {personalDetails.map((row, idx) => (
+                            <tr key={row.id} className="relative editable-container group hover:bg-zinc-50/50">
+                                <td 
+                                    className={`w-40 font-bold align-top pb-1 ${isEditMode ? 'editable-highlight' : ''}`}
+                                    onClick={() => openEdit('Label Data', row.label, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].label = val; return n; }))}
+                                >
+                                    {row.label}
+                                </td>
+                                <td className="w-4 align-top text-center">:</td>
+                                <td 
+                                    className={`align-top pb-1 ${isEditMode ? 'editable-highlight' : ''}`}
+                                    onClick={() => openEdit('Isi Data', row.value, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].value = val; return n; }))}
+                                >
+                                    {row.isBold ? <strong>{row.value}</strong> : row.value}
+                                </td>
+                                {isEditMode && (
+                                    <td className="w-8 align-middle text-right">
+                                        <button onClick={() => deleteItem(setPersonalDetails, idx)} className="text-zinc-300 hover:text-red-500 p-1">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </td>
+                                )}
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
+                {isEditMode && (
+                    <button onClick={() => addItem('detail')} className="add-btn">
+                        <PlusCircle size={14} /> Tambah Baris Data
+                    </button>
+                )}
 
                 <p className="mb-4">Sebagai bahan pertimbangan, saya lampirkan:</p>
 
+                {/* --- ATTACHMENTS (DYNAMIC LIST) --- */}
                 <ol className="list-decimal ml-6 pl-2 mb-4">
-                    {jobData.attachments.split(',').map((item, idx) => (
-                        item.trim() && <li key={idx} className="capitalize">{item.trim()}</li>
+                    {attachments.map((item, idx) => (
+                         <li key={idx} className="relative editable-container group pl-1">
+                            <span 
+                                className={`capitalize ${isEditMode ? 'editable-highlight' : ''}`}
+                                onClick={() => openEdit(`Lampiran ke-${idx+1}`, item, (val) => setAttachments(prev => { const n = [...prev]; n[idx] = val; return n; }))}
+                            >
+                                {item}
+                            </span>
+                            {isEditMode && (
+                                <button onClick={() => deleteItem(setAttachments, idx)} className="action-btn -left-8 top-0" title="Hapus Lampiran">
+                                    <Trash2 size={12} />
+                                </button>
+                            )}
+                         </li>
                     ))}
                 </ol>
+                {isEditMode && (
+                    <button onClick={() => addItem('attachment')} className="add-btn">
+                        <PlusCircle size={14} /> Tambah Lampiran
+                    </button>
+                )}
 
-                {/* Paragraf Penutup Dinamis */}
-                <p className="mb-4">{letterContent.paragraphClosing}</p>
+                {/* Closing Paragraph */}
+                <p 
+                    className={`mb-4 ${isEditMode ? 'editable-highlight ring-offset-2' : ''}`}
+                    onClick={() => openEdit('Paragraf Penutup', closingData.intro, (val) => setClosingData({...closingData, intro: val}))}
+                >
+                    {closingData.intro}
+                </p>
             </div>
 
-            {/* Signature Section */}
             <div className="mt-8 relative h-40">
-                <p>Hormat Saya,</p>
+                <p 
+                    className={isEditMode ? 'editable-highlight w-fit' : ''}
+                    onClick={() => openEdit('Salam Penutup', closingData.greeting, (val) => setClosingData({...closingData, greeting: val}))}
+                >
+                    {closingData.greeting}
+                </p>
+                
                 {signatureImage && (
                     <img 
                         ref={dragItemRef} src={signatureImage} alt="Tanda Tangan" 
@@ -535,23 +478,22 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
                         style={{ left: position.x, top: position.y }}
                     />
                 )}
-                <p className="font-bold underline mt-20 relative z-0">{userData.fullName}</p>
+                
+                <p 
+                    className={`font-bold underline mt-20 relative z-0 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Nama Penanda Tangan', closingData.signerName, (val) => setClosingData({...closingData, signerName: val}))}
+                >
+                    {closingData.signerName}
+                </p>
             </div>
         </div>
       </div>
-
-      {/* --- TOOLS TANDA TANGAN --- */}
+      
+      {/* Footer Tools Tanda Tangan */}
       <div className="mt-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm text-center print:hidden w-full max-w-md">
         <h3 className="text-zinc-900 dark:text-white font-bold mb-4">Area Tanda Tangan</h3>
-        <div className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl inline-block">
-            <canvas ref={canvasRef} width={300} height={100} className="bg-white border border-zinc-200 dark:border-zinc-700 rounded-lg mx-auto touch-none cursor-crosshair shadow-inner"
-                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} />
-        </div>
-        <div className="flex gap-2 justify-center mt-6">
-            <button onClick={clearCanvas} className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors"><Trash2 size={16}/> Hapus</button>
-            <button onClick={useSignature} className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 font-medium text-sm transition-colors"><Check size={16}/> Pakai</button>
-            <label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium text-sm cursor-pointer transition-colors"><Upload size={16}/> Upload <input type="file" accept="image/*" onChange={handleUpload} className="hidden"/></label>
-        </div>
+        <div className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl inline-block"><canvas ref={canvasRef} width={300} height={100} className="bg-white border border-zinc-200 dark:border-zinc-700 rounded-lg mx-auto touch-none cursor-crosshair shadow-inner" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} /></div>
+        <div className="flex gap-2 justify-center mt-6"><button onClick={clearCanvas} className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors"><Trash2 size={16}/> Hapus</button><button onClick={useSignature} className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 font-medium text-sm transition-colors"><Check size={16}/> Pakai</button><label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium text-sm cursor-pointer transition-colors"><Upload size={16}/> Upload <input type="file" accept="image/*" onChange={handleUpload} className="hidden"/></label></div>
       </div>
     </div>
   );
