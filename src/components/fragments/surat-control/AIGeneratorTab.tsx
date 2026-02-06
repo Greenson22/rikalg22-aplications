@@ -1,6 +1,6 @@
 // src/components/fragments/surat-control/AIGeneratorTab.tsx
 import React, { useState } from 'react';
-import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, Check } from 'lucide-react';
+import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, RefreshCw } from 'lucide-react';
 import { DataRow, AttachmentItem, JobTarget, UserProfile } from '../../../types/surat';
 import { Button } from '../../elements/Button';
 
@@ -32,6 +32,15 @@ interface AIGeneratorTabProps {
   onLoadProfile: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
+const STANDARD_LABELS = [
+  'Nama', 
+  'Tempat, Tgl. Lahir', 
+  'Pendidikan Terakhir', 
+  'Alamat', 
+  'No. Telepon', 
+  'Email'
+];
+
 export const AIGeneratorTab = ({
   personalDetails, onDetailChange,
   attachments, onToggleAttachment, onUpdateAttachment, onDeleteAttachment, onAddAttachment,
@@ -51,7 +60,8 @@ export const AIGeneratorTab = ({
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null); 
   const [editFormData, setEditFormData] = useState<UserProfile | null>(null); 
 
-  // Handlers for Manage Profile
+  // --- Handlers for Manage Profile ---
+
   const handleStartEdit = (profile: UserProfile) => {
     setEditingProfileId(profile.id);
     setEditFormData(JSON.parse(JSON.stringify(profile))); // Deep copy
@@ -60,19 +70,16 @@ export const AIGeneratorTab = ({
   const handleStartAdd = () => {
     const newId = Date.now().toString();
     setEditingProfileId('new');
-    // UPDATE: Menambahkan field default lengkap sesuai permintaan
     setEditFormData({
       id: newId,
       profileName: 'Profil Baru',
       fullName: '',
-      details: [
-        { id: '1', label: 'Nama', value: '', isBold: true },
-        { id: '2', label: 'Tempat, Tgl. Lahir', value: '' },
-        { id: '3', label: 'Pendidikan Terakhir', value: '' },
-        { id: '4', label: 'Alamat', value: '' },
-        { id: '5', label: 'No. Telepon', value: '' },
-        { id: '6', label: 'Email', value: '' }
-      ],
+      details: STANDARD_LABELS.map((label, idx) => ({
+        id: (idx + 1).toString(),
+        label,
+        value: '',
+        isBold: label === 'Nama'
+      })),
       attachments: [
         { id: '1', text: "Daftar Riwayat Hidup (CV)", isChecked: true },
         { id: '2', text: "Portofolio", isChecked: true }
@@ -92,14 +99,12 @@ export const AIGeneratorTab = ({
     const namaRow = editFormData.details.find(d => d.label.toLowerCase().includes('nama'));
     const finalData = {
         ...editFormData,
-        fullName: namaRow ? namaRow.value : editFormData.fullName
+        fullName: namaRow ? namaRow.value : (editFormData.fullName || "Tanpa Nama")
     };
 
     if (editingProfileId === 'new') {
-        // Add New
         setSavedProfiles(prev => [...prev, finalData]);
     } else {
-        // Update Existing
         setSavedProfiles(prev => prev.map(p => p.id === finalData.id ? finalData : p));
     }
     setEditingProfileId(null);
@@ -116,7 +121,9 @@ export const AIGeneratorTab = ({
       setEditFormData(prev => prev ? ({ ...prev, [field]: val }) : null);
   };
 
-  const updateEditDetail = (idx: number, val: string) => {
+  // --- Handlers for Dynamic Row Editing ---
+
+  const updateEditDetailValue = (idx: number, val: string) => {
       setEditFormData(prev => {
           if(!prev) return null;
           const updatedDetails = [...prev.details];
@@ -124,6 +131,41 @@ export const AIGeneratorTab = ({
           return { ...prev, details: updatedDetails };
       });
   };
+
+  const updateEditDetailLabel = (idx: number, val: string) => {
+      setEditFormData(prev => {
+          if(!prev) return null;
+          const updatedDetails = [...prev.details];
+          updatedDetails[idx] = { ...updatedDetails[idx], label: val };
+          return { ...prev, details: updatedDetails };
+      });
+  };
+
+  const removeDetailRow = (idx: number) => {
+      setEditFormData(prev => {
+          if(!prev) return null;
+          const newDetails = prev.details.filter((_, i) => i !== idx);
+          return { ...prev, details: newDetails };
+      });
+  };
+
+  const addDetailRow = (label: string = '') => {
+      setEditFormData(prev => {
+          if(!prev) return null;
+          const newRow: DataRow = {
+              id: Date.now().toString() + Math.random(),
+              label: label || 'Label Baru',
+              value: '',
+              isBold: label === 'Nama'
+          };
+          return { ...prev, details: [...prev.details, newRow] };
+      });
+  };
+
+  // Cek field standar mana yang hilang (untuk fitur restore)
+  const missingStandards = editFormData 
+    ? STANDARD_LABELS.filter(std => !editFormData.details.some(d => d.label.trim().toLowerCase() === std.toLowerCase()))
+    : [];
 
   return (
     <>
@@ -158,7 +200,7 @@ export const AIGeneratorTab = ({
       {/* --- MODAL: KELOLA PROFIL (CRUD) --- */}
       {isManageModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl h-[500px] rounded-2xl shadow-2xl border dark:border-zinc-800 flex overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl h-[550px] rounded-2xl shadow-2xl border dark:border-zinc-800 flex overflow-hidden">
              
              {/* Left Sidebar: List Profiles */}
              <div className="w-1/3 bg-zinc-50 dark:bg-zinc-900/50 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
@@ -202,18 +244,69 @@ export const AIGeneratorTab = ({
                                     <label className="text-xs font-bold text-zinc-500 uppercase">Nama Profil (Label)</label>
                                     <input type="text" value={editFormData.profileName} onChange={e => updateEditField('profileName', e.target.value)} className="w-full mt-1 p-2 text-sm border rounded-lg bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Misal: Profil Saya (Formal)" />
                                 </div>
+                                
                                 <div className="border-t border-zinc-100 dark:border-zinc-800 my-4"></div>
-                                <h4 className="font-bold text-sm text-zinc-700 dark:text-zinc-300 mb-2">Detail Data Diri</h4>
-                                {editFormData.details.map((detail, idx) => (
-                                    <div key={idx} className="grid grid-cols-12 gap-2 items-center mb-2">
-                                        <div className="col-span-4">
-                                             <input type="text" value={detail.label} disabled className="w-full bg-transparent text-[10px] font-bold text-zinc-500 uppercase text-right pr-2" />
-                                        </div>
-                                        <div className="col-span-8">
-                                            <input type="text" value={detail.value} onChange={e => updateEditDetail(idx, e.target.value)} className="w-full p-1.5 text-xs border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:border-blue-500 outline-none" />
-                                        </div>
+                                
+                                <div className="flex justify-between items-end mb-2">
+                                  <h4 className="font-bold text-sm text-zinc-700 dark:text-zinc-300">Detail Data Diri</h4>
+                                  <button onClick={() => addDetailRow()} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition"><Plus size={10}/> Custom Field</button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {editFormData.details.map((detail, idx) => (
+                                      <div key={idx} className="group flex items-center gap-2">
+                                          {/* Input Label */}
+                                          <div className="w-1/3">
+                                               <input 
+                                                 type="text" 
+                                                 value={detail.label} 
+                                                 onChange={e => updateEditDetailLabel(idx, e.target.value)}
+                                                 className="w-full bg-transparent text-[10px] font-bold text-zinc-500 uppercase text-right pr-2 border-b border-transparent focus:border-blue-400 outline-none transition-colors hover:text-zinc-700"
+                                                 placeholder="LABEL..."
+                                               />
+                                          </div>
+                                          {/* Input Value */}
+                                          <div className="flex-1 relative">
+                                              <input 
+                                                type="text" 
+                                                value={detail.value} 
+                                                onChange={e => updateEditDetailValue(idx, e.target.value)} 
+                                                className="w-full p-1.5 text-xs border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:border-blue-500 outline-none pr-8" 
+                                                placeholder={`Isi data...`}
+                                              />
+                                          </div>
+                                          {/* Delete Button */}
+                                          <button 
+                                            onClick={() => removeDetailRow(idx)}
+                                            className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded transition-all opacity-0 group-hover:opacity-100"
+                                            title="Hapus baris ini"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                      </div>
+                                  ))}
+                                </div>
+
+                                {/* Section Restore Data Standar */}
+                                {missingStandards.length > 0 && (
+                                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-dashed border-blue-200 dark:border-blue-800">
+                                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
+                                      <RefreshCw size={10} /> Kembalikan Data Standar:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {missingStandards.map(label => (
+                                        <button 
+                                          key={label}
+                                          onClick={() => addDetailRow(label)}
+                                          className="text-[10px] px-2 py-1 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-zinc-700 rounded-md text-zinc-600 dark:text-zinc-300 hover:text-blue-600 hover:border-blue-400 transition shadow-sm"
+                                        >
+                                          + {label}
+                                        </button>
+                                      ))}
                                     </div>
-                                ))}
+                                  </div>
+                                )}
+
                                 <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-4">Catatan: Mengedit di sini hanya mengubah data yang disimpan, tidak langsung mengubah tampilan surat utama kecuali Anda memilihnya lagi.</p>
                             </div>
                         )
