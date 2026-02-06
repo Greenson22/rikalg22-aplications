@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 
 // Membuat file database 'surat.db' di root project
-const dbPath = path.join(process.cwd(), 'surat.db');
+const dbPath = path.join(process.cwd(), 'rikalg22.db');
 const db = new Database(dbPath);
 
 // Inisialisasi Tabel saat pertama kali jalan
