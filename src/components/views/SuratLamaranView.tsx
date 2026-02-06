@@ -359,10 +359,42 @@ INSTRUKSI:
           </div>
         )}
 
+        {/* --- BAGIAN AI (DIPERBARUI) --- */}
         {activeTab === 'ai' && (
             <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* KOLOM KIRI: INPUT TARGET LAMARAN */}
+               {/* KOLOM KIRI: INPUT TARGET LAMARAN + PILIH PROFIL */}
                <div className="space-y-4">
+                  
+                  {/* --- FITUR BARU: PILIH PROFIL PELAMAR --- */}
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+                      <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-3 text-sm">
+                          <User size={16} className="text-blue-500"/> 0. Pilih Data Pelamar
+                      </h4>
+                      <div className="space-y-2">
+                          <p className="text-xs text-zinc-500">
+                              Data diri siapa yang ingin dimasukkan ke dalam Prompt AI?
+                          </p>
+                          <select 
+                            onChange={handleLoadProfile} 
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          >
+                              <option value="">-- Gunakan Data yang Tampil Saat Ini --</option>
+                              {savedProfiles.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.profileName} ({p.fullName})
+                                  </option>
+                              ))}
+                          </select>
+                          
+                          {/* Preview Nama Aktif */}
+                          <div className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 p-2 rounded text-zinc-600 dark:text-zinc-400 mt-2 border border-zinc-200 dark:border-zinc-700">
+                             Data Aktif: <span className="font-bold text-zinc-900 dark:text-zinc-200">
+                                {personalDetails.find(d => d.label.toLowerCase().includes('nama'))?.value || "Belum ada nama"}
+                             </span>
+                          </div>
+                      </div>
+                  </div>
+                  
                   <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
                       <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16}/> 1. Info Lowongan</h4>
                       <div className="space-y-3">
@@ -401,7 +433,7 @@ INSTRUKSI:
                   
                   <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
                      <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-2 text-sm"><Copy size={16}/> 2. Generate Prompt</h4>
-                     <p className="text-xs text-zinc-500 mb-3">Sistem akan menggabungkan data profil di surat saat ini dengan info lowongan di atas.</p>
+                     <p className="text-xs text-zinc-500 mb-3">Sistem akan menggabungkan <strong>Data Pelamar (di atas)</strong> dengan <strong>Info Lowongan</strong>.</p>
                      <button onClick={copyToClipboard} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-bold hover:shadow-lg transition-all active:scale-95">
                         Salin Prompt ke Clipboard
                      </button>
