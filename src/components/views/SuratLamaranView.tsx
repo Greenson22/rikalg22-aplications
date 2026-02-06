@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
-  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle, Save, FilePlus, ChevronDown, ChevronUp
+  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle, Save, FilePlus, ChevronDown, ChevronUp,
+  ListChecks, GripVertical
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
@@ -14,11 +15,18 @@ interface DataRow {
   isBold?: boolean;
 }
 
+interface AttachmentItem {
+  id: string;
+  text: string;
+  isChecked: boolean;
+}
+
 interface UserProfile {
   id: string;
   profileName: string; 
   fullName: string;
-  details: DataRow[]; 
+  details: DataRow[];
+  attachments?: AttachmentItem[]; // Simpan preferensi lampiran juga
 }
 
 export const SuratLamaranView = () => {
@@ -28,8 +36,9 @@ export const SuratLamaranView = () => {
   const [settings, setSettings] = useState({ fontSize: 12, lineHeight: 1.4, margin: 2.5 });
   const [isEditMode, setIsEditMode] = useState(false);
   
-  // State untuk toggle accordion detail data di tab AI
+  // State untuk toggle accordion
   const [showDetailInputs, setShowDetailInputs] = useState(true);
+  const [showAttachmentInputs, setShowAttachmentInputs] = useState(true);
 
   // --- STATE TARGET LAMARAN (Untuk AI Prompt) ---
   const [targetJob, setTargetJob] = useState({
@@ -73,7 +82,7 @@ export const SuratLamaranView = () => {
     "Saya memiliki kemampuan adaptasi yang cepat, disiplin, dan mampu bekerja dalam tim maupun individu."
   ]);
 
-  // 4. Data Diri (Bisa ditambah/dikurang)
+  // 4. Data Diri
   const [personalDetails, setPersonalDetails] = useState<DataRow[]>([
     { id: '1', label: 'Nama', value: 'Frendy Rikal Gerung', isBold: true },
     { id: '2', label: 'Tempat, Tgl. Lahir', value: 'Raanan Baru, 22 Februari 2002' },
@@ -83,12 +92,14 @@ export const SuratLamaranView = () => {
     { id: '6', label: 'Email', value: 'frendegerung634@gmail.com' },
   ]);
 
-  // 5. Lampiran
-  const [attachments, setAttachments] = useState<string[]>([
-    "Daftar Riwayat Hidup (CV)",
-    "Portofolio",
-    "Fotokopi Ijazah & Transkrip Nilai",
-    "Pas Foto Terbaru"
+  // 5. Lampiran (Updated to Object Array)
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([
+    { id: '1', text: "Daftar Riwayat Hidup (CV)", isChecked: true },
+    { id: '2', text: "Portofolio", isChecked: true },
+    { id: '3', text: "Fotokopi Ijazah & Transkrip Nilai", isChecked: true },
+    { id: '4', text: "Pas Foto Terbaru", isChecked: true },
+    { id: '5', text: "Sertifikat Pendukung", isChecked: false },
+    { id: '6', text: "Surat Keterangan Catatan Kepolisian (SKCK)", isChecked: false },
   ]);
 
   // 6. Penutup
@@ -124,9 +135,29 @@ export const SuratLamaranView = () => {
     } else if (type === 'detail') {
       setPersonalDetails(prev => [...prev, { id: Date.now().toString(), label: 'Label Baru', value: 'Isi Data...' }]);
     } else if (type === 'attachment') {
-      setAttachments(prev => [...prev, "Lampiran Baru..."]);
+      // Menambah lampiran baru via tombol di kertas (default checked)
+      setAttachments(prev => [...prev, { id: Date.now().toString(), text: "Dokumen Baru...", isChecked: true }]);
     }
   };
+
+  // Helper khusus untuk Attachment di Sidebar
+  const toggleAttachment = (id: string) => {
+    setAttachments(prev => prev.map(a => a.id === id ? { ...a, isChecked: !a.isChecked } : a));
+  };
+
+  const updateAttachmentText = (id: string, newText: string) => {
+    setAttachments(prev => prev.map(a => a.id === id ? { ...a, text: newText } : a));
+  };
+
+  const deleteAttachmentById = (id: string) => {
+    if(!confirm("Hapus item lampiran ini?")) return;
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
+
+  const addNewAttachment = () => {
+    setAttachments(prev => [...prev, { id: Date.now().toString(), text: "", isChecked: true }]);
+  };
+
 
   // --- LOGIC PROFIL & SAVE ---
   useEffect(() => {
@@ -138,14 +169,14 @@ export const SuratLamaranView = () => {
     const profileName = prompt("Masukkan nama untuk profil ini (contoh: Profil IT, Profil Admin):", "Profil Saya");
     if (!profileName) return;
 
-    // Cari nama lengkap dari data details
     const nameRow = personalDetails.find(d => d.label.toLowerCase().includes('nama'))?.value || "Tanpa Nama";
 
     const newProfile: UserProfile = {
       id: Date.now().toString(),
       profileName,
       fullName: nameRow,
-      details: personalDetails 
+      details: personalDetails,
+      attachments: attachments // Simpan state lampiran juga
     };
 
     const updated = [...savedProfiles, newProfile];
@@ -164,8 +195,13 @@ export const SuratLamaranView = () => {
         { id: '5', label: 'No. Telepon', value: '' },
         { id: '6', label: 'Email', value: '' },
     ]);
+    setAttachments([
+        { id: '1', text: "CV / Daftar Riwayat Hidup", isChecked: true },
+        { id: '2', text: "Ijazah Terakhir", isChecked: true },
+        { id: '3', text: "Transkrip Nilai", isChecked: true },
+    ]);
     setClosingData(prev => ({...prev, signerName: "[Nama Lengkap]"}));
-    setShowDetailInputs(true); // Pastikan form terbuka agar user bisa langsung ketik
+    setShowDetailInputs(true);
   };
 
   const handleLoadProfile = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -174,6 +210,9 @@ export const SuratLamaranView = () => {
     if (selected) {
       setPersonalDetails(selected.details);
       setClosingData(prev => ({ ...prev, signerName: selected.fullName }));
+      if (selected.attachments) {
+          setAttachments(selected.attachments);
+      }
     }
   };
 
@@ -184,15 +223,12 @@ export const SuratLamaranView = () => {
       localStorage.setItem('userProfiles', JSON.stringify(updated));
   }
   
-  // Update data dari input field di tab AI
   const handleDetailChange = (index: number, newValue: string) => {
       setPersonalDetails(prev => {
           const updated = [...prev];
           updated[index].value = newValue;
           return updated;
       });
-
-      // Jika labelnya mengandung "nama", update juga di bagian tanda tangan
       const row = personalDetails[index];
       if (row.label.toLowerCase().includes('nama')) {
           setClosingData(prev => ({ ...prev, signerName: newValue }));
@@ -209,6 +245,14 @@ export const SuratLamaranView = () => {
         if(data.paragraphs && Array.isArray(data.paragraphs)) setBodyParagraphs(data.paragraphs);
         if(data.details && Array.isArray(data.details)) setPersonalDetails(data.details);
         if(data.closing) setClosingData(prev => ({...prev, ...data.closing}));
+        // Optional: Jika AI mengembalikan array string untuk attachments
+        if(data.attachments && Array.isArray(data.attachments)) {
+             setAttachments(data.attachments.map((txt: string) => ({
+                 id: Date.now().toString() + Math.random(),
+                 text: txt,
+                 isChecked: true
+             })));
+        }
         alert("Surat berhasil diperbarui dari JSON!");
         setActiveTab('design'); 
       } catch (e) {
@@ -218,13 +262,14 @@ export const SuratLamaranView = () => {
 
   const generateDynamicPrompt = () => { 
     const personalInfoString = personalDetails.map(d => `- ${d.label}: ${d.value}`).join('\n');
-    const attachmentsString = attachments.join(', ');
+    // Hanya gunakan lampiran yang dicentang
+    const attachmentsString = attachments.filter(a => a.isChecked).map(a => a.text).join(', ');
 
     return `Bertindaklah sebagai pelamar kerja profesional. Saya ingin membuat surat lamaran kerja dalam format JSON yang valid.
 
 DATA SAYA:
 ${personalInfoString}
-Lampiran: ${attachmentsString}
+Lampiran (Sertakan di surat): ${attachmentsString}
 
 TUJUAN LAMARAN:
 - Posisi: ${targetJob.position || '[Isi Posisi]'}
@@ -349,6 +394,8 @@ INSTRUKSI:
 
         {activeTab === 'data' && (
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
+             
+             {/* KOLOM KIRI: Load/Save Profil */}
              <div className="space-y-4">
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Pilih Profil Tersimpan</label>
                 <div className="flex gap-2">
@@ -358,29 +405,72 @@ INSTRUKSI:
                     </select>
                 </div>
                 
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-sm text-blue-700 dark:text-blue-300 space-y-2">
-                    <p><strong>Tips:</strong> Ubah data diri langsung di kertas surat di bawah (klik teks garis putus-putus).</p>
-                    <p>Setelah selesai mengedit data diri, klik tombol simpan di bawah untuk menyimpannya sebagai preset profil baru.</p>
-                </div>
-
-                <Button onClick={handleSaveCurrentProfile} className="w-full justify-center">
-                    <Save size={18} /> Simpan Data di Surat sebagai Profil Baru
-                </Button>
-             </div>
-             
-             {savedProfiles.length > 0 && (
-                 <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-zinc-700">Daftar Profil Tersimpan:</h4>
-                    <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                {/* LIST PROFIL TERSEDIA */}
+                {savedProfiles.length > 0 && (
+                 <div className="space-y-2 pt-2">
+                    <h4 className="text-xs font-semibold text-zinc-500 uppercase">Daftar Profil:</h4>
+                    <ul className="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                         {savedProfiles.map(p => (
-                            <li key={p.id} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 text-sm">
+                            <li key={p.id} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 text-sm group">
                                 <span>{p.profileName} <span className="text-xs text-zinc-400">({p.fullName})</span></span>
-                                <button onClick={() => handleDeleteProfile(p.id)} className="text-zinc-400 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                                <button onClick={() => handleDeleteProfile(p.id)} className="text-zinc-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
                             </li>
                         ))}
                     </ul>
                  </div>
-             )}
+                )}
+                
+                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                   <Button onClick={handleSaveCurrentProfile} className="w-full justify-center">
+                        <Save size={18} /> Simpan Data Saat Ini sebagai Profil
+                   </Button>
+                </div>
+             </div>
+
+             {/* KOLOM KANAN: KELOLA LAMPIRAN (FITUR BARU) */}
+             <div className="space-y-4">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm h-full flex flex-col">
+                    <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-3 text-sm">
+                        <ListChecks size={18} className="text-green-600"/> Kelola Lampiran
+                    </h4>
+                    <p className="text-xs text-zinc-500 mb-3">
+                        Centang item yang ingin disertakan dalam surat (bahan pertimbangan).
+                    </p>
+                    
+                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[250px] pr-1">
+                        {attachments.map((att) => (
+                            <div key={att.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800 group transition-all">
+                                <input 
+                                    type="checkbox" 
+                                    checked={att.isChecked} 
+                                    onChange={() => toggleAttachment(att.id)}
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <input 
+                                    type="text" 
+                                    value={att.text} 
+                                    onChange={(e) => updateAttachmentText(att.id, e.target.value)}
+                                    className={`flex-1 bg-transparent text-sm border-none outline-none focus:ring-0 ${!att.isChecked ? 'text-zinc-400 line-through' : 'text-zinc-700 dark:text-zinc-300'}`}
+                                    placeholder="Isi lampiran..."
+                                />
+                                <button 
+                                    onClick={() => deleteAttachmentById(att.id)} 
+                                    className="text-zinc-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={14}/>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button 
+                        onClick={addNewAttachment}
+                        className="mt-3 flex items-center justify-center gap-2 w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg text-xs font-bold text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                    >
+                        <Plus size={14}/> Tambah Item Lampiran
+                    </button>
+                </div>
+             </div>
            </div>
         )}
 
@@ -390,55 +480,28 @@ INSTRUKSI:
           </div>
         )}
 
-        {/* --- BAGIAN AI (DIPERBARUI DENGAN INPUT FIELD) --- */}
+        {/* --- BAGIAN AI --- */}
         {activeTab === 'ai' && (
             <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* KOLOM KIRI */}
                <div className="space-y-4">
-                  
                   {/* --- CARD DATA PELAMAR --- */}
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
                       <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-3 text-sm">
                           <User size={16} className="text-blue-500"/> 0. Data Pelamar
                       </h4>
                       <div className="space-y-3">
-                          <p className="text-xs text-zinc-500">
-                              Pilih data atau edit langsung di bawah ini.
-                          </p>
-                          <select 
-                            onChange={handleLoadProfile} 
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                          >
-                              <option value="">-- Gunakan Data yang Tampil Saat Ini --</option>
-                              {savedProfiles.map(p => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.profileName} ({p.fullName})
-                                  </option>
-                              ))}
-                          </select>
-                          
-                          {/* TOMBOL AKSI */}
                           <div className="flex gap-2">
-                             <button 
-                                onClick={handleCreateNewProfile}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-colors border border-zinc-200 dark:border-zinc-700"
-                             >
+                             <button onClick={handleCreateNewProfile} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-colors border border-zinc-200 dark:border-zinc-700">
                                 <FilePlus size={14}/> Reset / Baru
                              </button>
-                             <button 
-                                onClick={handleSaveCurrentProfile}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg text-xs font-bold transition-colors border border-blue-100 dark:border-blue-800"
-                             >
+                             <button onClick={handleSaveCurrentProfile} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg text-xs font-bold transition-colors border border-blue-100 dark:border-blue-800">
                                 <Save size={14}/> Simpan Profil
                              </button>
                           </div>
 
-                          {/* FORMULIR EDIT DATA DIRI (ACCORDION) */}
+                          {/* ACCORDION DATA DIRI */}
                           <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-2">
-                              <button 
-                                onClick={() => setShowDetailInputs(!showDetailInputs)}
-                                className="flex items-center justify-between w-full text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors mb-2"
-                              >
+                              <button onClick={() => setShowDetailInputs(!showDetailInputs)} className="flex items-center justify-between w-full text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors mb-2">
                                   <span>EDIT DETAIL DATA DIRI</span>
                                   {showDetailInputs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                               </button>
@@ -447,66 +510,46 @@ INSTRUKSI:
                                   <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
                                       {personalDetails.map((detail, index) => (
                                           <div key={detail.id} className="grid grid-cols-12 gap-2 items-center">
-                                              <label className="col-span-4 text-[10px] font-medium text-zinc-500 uppercase truncate" title={detail.label}>
-                                                  {detail.label}
-                                              </label>
-                                              <input 
-                                                  type="text" 
-                                                  value={detail.value}
-                                                  placeholder={`Isi ${detail.label}...`}
-                                                  onChange={(e) => handleDetailChange(index, e.target.value)}
-                                                  className="col-span-8 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-zinc-300"
-                                              />
+                                              <label className="col-span-4 text-[10px] font-medium text-zinc-500 uppercase truncate" title={detail.label}>{detail.label}</label>
+                                              <input type="text" value={detail.value} placeholder={`Isi ${detail.label}...`} onChange={(e) => handleDetailChange(index, e.target.value)} className="col-span-8 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-zinc-300" />
                                           </div>
                                       ))}
                                   </div>
                               )}
                           </div>
+                          
+                           {/* ACCORDION LAMPIRAN (Quick View) */}
+                           <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                              <button onClick={() => setShowAttachmentInputs(!showAttachmentInputs)} className="flex items-center justify-between w-full text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors mb-2">
+                                  <span>PILIH LAMPIRAN ({attachments.filter(a=>a.isChecked).length})</span>
+                                  {showAttachmentInputs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                              </button>
+                              {showAttachmentInputs && (
+                                   <div className="grid grid-cols-2 gap-2">
+                                       {attachments.map(att => (
+                                           <div key={att.id} onClick={() => toggleAttachment(att.id)} className={`cursor-pointer px-2 py-1.5 rounded border text-[10px] transition-all truncate ${att.isChecked ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-zinc-50 border-zinc-200 text-zinc-400'}`}>
+                                               {att.text}
+                                           </div>
+                                       ))}
+                                   </div>
+                              )}
+                           </div>
                       </div>
                   </div>
                   
                   <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
                       <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16}/> 1. Info Lowongan</h4>
                       <div className="space-y-3">
-                          <div>
-                              <label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label>
-                              <input 
-                                type="text" 
-                                placeholder="Contoh: Frontend Developer" 
-                                value={targetJob.position}
-                                onChange={e => setTargetJob({...targetJob, position: e.target.value})}
-                                className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"
-                              />
-                          </div>
-                          <div>
-                              <label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label>
-                              <input 
-                                type="text" 
-                                placeholder="Contoh: PT Google Indonesia" 
-                                value={targetJob.company}
-                                onChange={e => setTargetJob({...targetJob, company: e.target.value})}
-                                className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"
-                              />
-                          </div>
-                           <div>
-                              <label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label>
-                              <textarea 
-                                rows={2}
-                                placeholder="Contoh: Harus bisa React.js dan Tailwind, pengalaman 2 tahun." 
-                                value={targetJob.requirements}
-                                onChange={e => setTargetJob({...targetJob, requirements: e.target.value})}
-                                className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none"
-                              />
-                          </div>
+                          <div><label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label><input type="text" placeholder="Contoh: Frontend Developer" value={targetJob.position} onChange={e => setTargetJob({...targetJob, position: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"/></div>
+                          <div><label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label><input type="text" placeholder="Contoh: PT Google Indonesia" value={targetJob.company} onChange={e => setTargetJob({...targetJob, company: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700"/></div>
+                           <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({...targetJob, requirements: e.target.value})} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none"/></div>
                       </div>
                   </div>
                   
                   <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
                      <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-2 text-sm"><Copy size={16}/> 2. Generate Prompt</h4>
-                     <p className="text-xs text-zinc-500 mb-3">Sistem akan menggabungkan <strong>Data Pelamar (di atas)</strong> dengan <strong>Info Lowongan</strong>.</p>
-                     <button onClick={copyToClipboard} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-bold hover:shadow-lg transition-all active:scale-95">
-                        Salin Prompt ke Clipboard
-                     </button>
+                     <p className="text-xs text-zinc-500 mb-3">Sistem akan menggabungkan Data Pelamar & Lampiran dengan Info Lowongan.</p>
+                     <button onClick={copyToClipboard} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-bold hover:shadow-lg transition-all active:scale-95">Salin Prompt ke Clipboard</button>
                   </div>
                </div>
 
@@ -514,16 +557,8 @@ INSTRUKSI:
                <div className="space-y-3">
                     <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full flex flex-col">
                         <h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm"><ArrowDownToLine size={16}/> 3. Import JSON Result</h4>
-                        <p className="text-xs text-zinc-500 mb-2">Paste kode JSON dari ChatGPT/Gemini di sini untuk membuat surat otomatis.</p>
-                        <textarea 
-                            value={jsonInput} 
-                            onChange={(e) => setJsonInput(e.target.value)} 
-                            placeholder='Contoh: { "header": { ... } }' 
-                            className="w-full flex-1 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 outline-none" 
-                        />
-                        <button onClick={handleImportJson} disabled={!jsonInput} className="mt-3 w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
-                            Terapkan ke Surat
-                        </button>
+                        <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} placeholder='Contoh: { "header": { ... } }' className="w-full flex-1 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <button onClick={handleImportJson} disabled={!jsonInput} className="mt-3 w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md">Terapkan ke Surat</button>
                     </div>
                </div>
             </div>
@@ -535,34 +570,20 @@ INSTRUKSI:
         className="bg-white text-black shadow-2xl print:shadow-none relative mx-auto transition-all duration-300"
         style={{ width: '21cm', minHeight: '29.7cm', padding: `${settings.margin}cm`, fontSize: `${settings.fontSize}pt`, lineHeight: settings.lineHeight, fontFamily: '"Times New Roman", Times, serif' }}
       >
+        {/* Style Global untuk Kertas */}
         <style jsx global>{`
-            /* KOTAK PENANDA EDIT */
-            .editable-highlight { 
-                @apply cursor-pointer relative rounded border border-dashed border-zinc-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 px-1 -mx-1 py-0.5;
-            }
-            .editable-highlight:hover::after {
-                content: '✎';
-                @apply absolute -top-2 -right-2 text-[8px] bg-blue-500 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm pointer-events-none z-10;
-            }
-            
-            /* TOMBOL AKSI (HAPUS/TAMBAH) */
+            .editable-highlight { @apply cursor-pointer relative rounded border border-dashed border-zinc-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 px-1 -mx-1 py-0.5; }
+            .editable-highlight:hover::after { content: '✎'; @apply absolute -top-2 -right-2 text-[8px] bg-blue-500 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm pointer-events-none z-10; }
             .action-btn { @apply absolute hidden items-center justify-center w-6 h-6 rounded-full bg-white shadow-md border border-zinc-200 cursor-pointer z-20 hover:scale-110 transition-transform text-zinc-500 hover:text-red-500; }
             .editable-container:hover .action-btn { @apply flex; }
             .add-btn { @apply flex items-center justify-center gap-1 w-full py-1 mt-1 mb-2 border-2 border-dashed border-zinc-200 rounded-lg text-zinc-300 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition-all text-[10px] font-sans font-bold uppercase tracking-wider; }
-            
-            @media print { 
-                .no-print, .action-btn, .add-btn, .editable-highlight { border: none !important; background: none !important; padding: 0 !important; margin: 0 !important; }
-                .editable-highlight::after { display: none !important; }
-            }
+            @media print { .no-print, .action-btn, .add-btn, .editable-highlight { border: none !important; background: none !important; padding: 0 !important; margin: 0 !important; } .editable-highlight::after { display: none !important; } }
         `}</style>
 
         <div className="page-container-print">
             {/* Header: Date */}
             <div className={`text-right mb-6 editable-container relative group`}>
-                <span 
-                    className={isEditMode ? 'editable-highlight' : ''}
-                    onClick={() => openEdit('Tanggal Surat', headerData.cityDate, (val) => setHeaderData({...headerData, cityDate: val}))}
-                >
+                <span className={isEditMode ? 'editable-highlight' : ''} onClick={() => openEdit('Tanggal Surat', headerData.cityDate, (val) => setHeaderData({...headerData, cityDate: val}))}>
                     {headerData.cityDate}
                 </span>
             </div>
@@ -570,43 +591,25 @@ INSTRUKSI:
             {/* Header: Recipient */}
             <div className="text-left mb-8 space-y-1">
                 <div>
-                    <span 
-                        className={`mr-2 ${isEditMode ? 'editable-highlight' : ''}`}
-                        onClick={() => openEdit('Label Perihal', headerData.labelSubject, (val) => setHeaderData({...headerData, labelSubject: val}))}
-                    >
+                    <span className={`mr-2 ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Label Perihal', headerData.labelSubject, (val) => setHeaderData({...headerData, labelSubject: val}))}>
                         {headerData.labelSubject}:
                     </span>
-                    <strong 
-                        className={isEditMode ? 'editable-highlight' : ''}
-                        onClick={() => openEdit('Isi Perihal', headerData.subject, (val) => setHeaderData({...headerData, subject: val}))}
-                    >
+                    <strong className={isEditMode ? 'editable-highlight' : ''} onClick={() => openEdit('Isi Perihal', headerData.subject, (val) => setHeaderData({...headerData, subject: val}))}>
                         {headerData.subject}
                     </strong>
                 </div>
                 
                 <div className="pt-4">
-                    <span
-                        className={`block w-fit mb-1 ${isEditMode ? 'editable-highlight' : ''}`}
-                        onClick={() => openEdit('Label Yth', headerData.labelTo, (val) => setHeaderData({...headerData, labelTo: val}))}
-                    >
+                    <span className={`block w-fit mb-1 ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Label Yth', headerData.labelTo, (val) => setHeaderData({...headerData, labelTo: val}))}>
                         {headerData.labelTo}
                     </span>
-                    <strong 
-                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                        onClick={() => openEdit('Penerima', headerData.recipientTitle, (val) => setHeaderData({...headerData, recipientTitle: val}))}
-                    >
+                    <strong className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Penerima', headerData.recipientTitle, (val) => setHeaderData({...headerData, recipientTitle: val}))}>
                         {headerData.recipientTitle}
                     </strong>
-                    <strong 
-                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                        onClick={() => openEdit('Nama Perusahaan', headerData.companyName, (val) => setHeaderData({...headerData, companyName: val}))}
-                    >
+                    <strong className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Nama Perusahaan', headerData.companyName, (val) => setHeaderData({...headerData, companyName: val}))}>
                         {headerData.companyName}
                     </strong>
-                    <div 
-                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                        onClick={() => openEdit('Alamat Penerima', headerData.recipientAddress, (val) => setHeaderData({...headerData, recipientAddress: val}))}
-                    >
+                    <div className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Alamat Penerima', headerData.recipientAddress, (val) => setHeaderData({...headerData, recipientAddress: val}))}>
                         {headerData.recipientAddress}
                     </div>
                 </div>
@@ -614,42 +617,25 @@ INSTRUKSI:
 
             <div className="text-justify">
                 {/* SALAM PEMBUKA */}
-                <p 
-                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Salam Pembuka', structure.greeting, (val) => setStructure({...structure, greeting: val}))}
-                >
+                <p className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Salam Pembuka', structure.greeting, (val) => setStructure({...structure, greeting: val}))}>
                     {structure.greeting}
                 </p>
 
                 {/* BODY PARAGRAPHS */}
                 {bodyParagraphs.map((para, idx) => (
                     <div key={idx} className="relative editable-container group mb-4">
-                        {isEditMode && (
-                            <button onClick={() => deleteItem(setBodyParagraphs, idx)} className="action-btn -right-8 top-0" title="Hapus Paragraf">
-                                <Trash2 size={12} />
-                            </button>
-                        )}
-                        <p 
-                            className={`${isEditMode ? 'editable-highlight' : ''}`}
-                            onClick={() => openEdit(`Paragraf ke-${idx+1}`, para, (val) => setBodyParagraphs(prev => { const n = [...prev]; n[idx] = val; return n; }))}
-                        >
+                        {isEditMode && <button onClick={() => deleteItem(setBodyParagraphs, idx)} className="action-btn -right-8 top-0" title="Hapus Paragraf"><Trash2 size={12} /></button>}
+                        <p className={`${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit(`Paragraf ke-${idx+1}`, para, (val) => setBodyParagraphs(prev => { const n = [...prev]; n[idx] = val; return n; }))}>
                             {para}
                         </p>
-                        {isEditMode && (
-                             <button onClick={() => addItem('paragraph', idx)} className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30 shadow-sm hover:scale-110" title="Sisipkan Paragraf Di Sini">
-                                <Plus size={14} />
-                             </button>
-                        )}
+                        {isEditMode && <button onClick={() => addItem('paragraph', idx)} className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30 shadow-sm hover:scale-110" title="Sisipkan Paragraf Di Sini"><Plus size={14} /></button>}
                     </div>
                 ))}
                 
                 {isEditMode && <button onClick={() => addItem('paragraph')} className="add-btn"><PlusCircle size={14} /> Tambah Paragraf</button>}
 
                 {/* INTRO DATA DIRI */}
-                <p 
-                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Intro Data Diri', structure.dataIntro, (val) => setStructure({...structure, dataIntro: val}))}
-                >
+                <p className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Intro Data Diri', structure.dataIntro, (val) => setStructure({...structure, dataIntro: val}))}>
                     {structure.dataIntro}
                 </p>
 
@@ -659,29 +645,17 @@ INSTRUKSI:
                         {personalDetails.map((row, idx) => (
                             <tr key={row.id} className="relative editable-container group hover:bg-zinc-50/50">
                                 <td className="w-40 align-top pb-1">
-                                    <span 
-                                        className={`font-bold ${isEditMode ? 'editable-highlight' : ''}`}
-                                        onClick={() => openEdit('Label Data', row.label, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].label = val; return n; }))}
-                                    >
+                                    <span className={`font-bold ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Label Data', row.label, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].label = val; return n; }))}>
                                         {row.label}
                                     </span>
                                 </td>
                                 <td className="w-4 align-top text-center">:</td>
                                 <td className="align-top pb-1">
-                                    <span
-                                        className={`${isEditMode ? 'editable-highlight' : ''} ${row.isBold ? 'font-bold' : ''}`}
-                                        onClick={() => openEdit('Isi Data', row.value, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].value = val; return n; }))}
-                                    >
+                                    <span className={`${isEditMode ? 'editable-highlight' : ''} ${row.isBold ? 'font-bold' : ''}`} onClick={() => openEdit('Isi Data', row.value, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].value = val; return n; }))}>
                                         {row.value}
                                     </span>
                                 </td>
-                                {isEditMode && (
-                                    <td className="w-8 align-middle text-right">
-                                        <button onClick={() => deleteItem(setPersonalDetails, idx)} className="text-zinc-300 hover:text-red-500 p-1">
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </td>
-                                )}
+                                {isEditMode && <td className="w-8 align-middle text-right"><button onClick={() => deleteItem(setPersonalDetails, idx)} className="text-zinc-300 hover:text-red-500 p-1"><Trash2 size={14} /></button></td>}
                             </tr>
                         ))}
                     </tbody>
@@ -689,63 +663,45 @@ INSTRUKSI:
                 {isEditMode && <button onClick={() => addItem('detail')} className="add-btn"><PlusCircle size={14} /> Tambah Baris Data</button>}
 
                 {/* INTRO LAMPIRAN */}
-                <p 
-                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Intro Lampiran', structure.attachmentIntro, (val) => setStructure({...structure, attachmentIntro: val}))}
-                >
+                <p className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Intro Lampiran', structure.attachmentIntro, (val) => setStructure({...structure, attachmentIntro: val}))}>
                     {structure.attachmentIntro}
                 </p>
 
-                {/* ATTACHMENTS */}
+                {/* ATTACHMENTS (Filtered by isChecked) */}
                 <ol className="list-decimal ml-6 pl-2 mb-4">
-                    {attachments.map((item, idx) => (
-                         <li key={idx} className="relative editable-container group pl-1 mb-1">
+                    {attachments.filter(a => a.isChecked).map((item, idx) => (
+                         <li key={item.id} className="relative editable-container group pl-1 mb-1">
                             <span 
                                 className={`capitalize ${isEditMode ? 'editable-highlight' : ''}`}
-                                onClick={() => openEdit(`Lampiran ke-${idx+1}`, item, (val) => setAttachments(prev => { const n = [...prev]; n[idx] = val; return n; }))}
+                                onClick={() => openEdit(`Lampiran`, item.text, (val) => updateAttachmentText(item.id, val))}
                             >
-                                {item}
+                                {item.text}
                             </span>
                             {isEditMode && (
-                                <button onClick={() => deleteItem(setAttachments, idx)} className="action-btn -left-8 top-0" title="Hapus Lampiran">
-                                    <Trash2 size={12} />
-                                </button>
+                                <span className="absolute -right-8 top-0 text-zinc-300 text-[10px] pointer-events-none no-print">(Edit di Data)</span>
                             )}
                          </li>
                     ))}
                 </ol>
+                {/* Note: Menambah lampiran di mode kertas akan menambahnya dalam keadaan tercentang */}
                 {isEditMode && <button onClick={() => addItem('attachment')} className="add-btn"><PlusCircle size={14} /> Tambah Lampiran</button>}
 
                 {/* CLOSING PARAGRAPH */}
-                <p 
-                    className={`mb-4 ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Paragraf Penutup', closingData.intro, (val) => setClosingData({...closingData, intro: val}))}
-                >
+                <p className={`mb-4 ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Paragraf Penutup', closingData.intro, (val) => setClosingData({...closingData, intro: val}))}>
                     {closingData.intro}
                 </p>
             </div>
 
             <div className="mt-8 relative h-40">
-                <p 
-                    className={isEditMode ? 'editable-highlight w-fit' : ''}
-                    onClick={() => openEdit('Salam Penutup', closingData.greeting, (val) => setClosingData({...closingData, greeting: val}))}
-                >
+                <p className={isEditMode ? 'editable-highlight w-fit' : ''} onClick={() => openEdit('Salam Penutup', closingData.greeting, (val) => setClosingData({...closingData, greeting: val}))}>
                     {closingData.greeting}
                 </p>
                 
                 {signatureImage && (
-                    <img 
-                        ref={dragItemRef} src={signatureImage} alt="Tanda Tangan" 
-                        onMouseDown={handleDragStart} onTouchStart={handleDragStart}
-                        className="absolute h-[70px] cursor-move z-10 hover:outline hover:outline-2 hover:outline-dashed hover:outline-zinc-300"
-                        style={{ left: position.x, top: position.y }}
-                    />
+                    <img ref={dragItemRef} src={signatureImage} alt="Tanda Tangan" onMouseDown={handleDragStart} onTouchStart={handleDragStart} className="absolute h-[70px] cursor-move z-10 hover:outline hover:outline-2 hover:outline-dashed hover:outline-zinc-300" style={{ left: position.x, top: position.y }} />
                 )}
                 
-                <p 
-                    className={`font-bold underline mt-20 relative z-0 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Nama Penanda Tangan', closingData.signerName, (val) => setClosingData({...closingData, signerName: val}))}
-                >
+                <p className={`font-bold underline mt-20 relative z-0 w-fit ${isEditMode ? 'editable-highlight' : ''}`} onClick={() => openEdit('Nama Penanda Tangan', closingData.signerName, (val) => setClosingData({...closingData, signerName: val}))}>
                     {closingData.signerName}
                 </p>
             </div>
