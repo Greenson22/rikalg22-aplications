@@ -42,3 +42,4 @@ next-env.d.ts
 
 #db
 surat.db
+temp_code
