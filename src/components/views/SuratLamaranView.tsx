@@ -358,36 +358,41 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
           <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-3 gap-6">
              
              {/* Kolom Kiri: Konfigurasi Prompt */}
-             <div className="space-y-3 lg:col-span-1">
-                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl p-4">
+              <div className="space-y-3 lg:col-span-1">
+                {/* TAMBAHKAN 'h-full' DI SINI AGAR KOTAK ORANYE TINGGINYA MENGIKUTI TETANGGA */}
+                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl p-4 h-full flex flex-col">
                   <h4 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2 mb-2 text-sm">
                     <Edit3 size={16}/> Konfigurasi Instruksi
                   </h4>
                   <p className="text-xs text-orange-600 dark:text-orange-400 mb-3">
-                    Ubah instruksi di bawah ini untuk mengarahkan gaya bahasa AI (misal: "Buat lebih santai").
+                    Ubah instruksi di bawah ini untuk mengarahkan gaya bahasa AI.
                   </p>
                   
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Pembuka</label>
-                      <input 
-                        className="input-field text-xs" 
+                  {/* Gunakan flex-1 agar area input mengisi sisa ruang vertikal */}
+                  <div className="flex flex-col gap-3 flex-1 min-h-0">
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Pembuka</label>
+                      <textarea 
+                        className="input-field text-xs resize-none flex-1"
                         value={promptInstructions.opening}
                         onChange={(e) => setPromptInstructions({...promptInstructions, opening: e.target.value})}
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Isi</label>
-                      <input 
-                        className="input-field text-xs" 
+                    
+                    {/* flex-[2] membuat bagian Body mendapat porsi tinggi 2x lipat dibanding header/footer */}
+                    <div className="flex-[2] flex flex-col min-h-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Isi</label>
+                      <textarea 
+                        className="input-field text-xs resize-none flex-1"
                         value={promptInstructions.body}
                         onChange={(e) => setPromptInstructions({...promptInstructions, body: e.target.value})}
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Penutup</label>
-                      <input 
-                        className="input-field text-xs" 
+
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Instruksi Penutup</label>
+                      <textarea 
+                        className="input-field text-xs resize-none flex-1"
                         value={promptInstructions.closing}
                         onChange={(e) => setPromptInstructions({...promptInstructions, closing: e.target.value})}
                       />
