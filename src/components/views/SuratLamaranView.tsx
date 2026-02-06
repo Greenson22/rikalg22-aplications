@@ -112,18 +112,31 @@ export const SuratLamaranView = () => {
   const addNewAttachment = () => setAttachments(prev => [...prev, { id: Date.now().toString(), text: "", isChecked: true }]);
 
   // --- LOGIC: PROFILE MANAGEMENT ---
-  useEffect(() => { const stored = localStorage.getItem('userProfiles'); if (stored) setSavedProfiles(JSON.parse(stored)); }, []);
+  // Load initial
+  useEffect(() => { 
+    const stored = localStorage.getItem('userProfiles'); 
+    if (stored) setSavedProfiles(JSON.parse(stored)); 
+  }, []);
+
+  // Sync to localStorage whenever savedProfiles changes
+  useEffect(() => {
+    if (savedProfiles.length > 0) {
+       localStorage.setItem('userProfiles', JSON.stringify(savedProfiles));
+    }
+  }, [savedProfiles]);
 
   const handleSaveCurrentProfile = () => {
     const profileName = prompt("Nama Profil:", "Profil Saya");
     if (!profileName) return;
     const newProfile: UserProfile = {
-      id: Date.now().toString(), profileName, fullName: personalDetails.find(d => d.label.toLowerCase().includes('nama'))?.value || "Tanpa Nama",
-      details: personalDetails, attachments: attachments
+      id: Date.now().toString(), 
+      profileName, 
+      fullName: personalDetails.find(d => d.label.toLowerCase().includes('nama'))?.value || "Tanpa Nama",
+      details: personalDetails, 
+      attachments: attachments
     };
-    const updated = [...savedProfiles, newProfile];
-    setSavedProfiles(updated);
-    localStorage.setItem('userProfiles', JSON.stringify(updated));
+    // localStorage sync handled by useEffect
+    setSavedProfiles(prev => [...prev, newProfile]);
     alert("Tersimpan!");
   };
 
@@ -138,9 +151,7 @@ export const SuratLamaranView = () => {
 
   const handleDeleteProfile = (id: string) => {
       if(!confirm("Hapus profil?")) return;
-      const updated = savedProfiles.filter(p => p.id !== id);
-      setSavedProfiles(updated);
-      localStorage.setItem('userProfiles', JSON.stringify(updated));
+      setSavedProfiles(prev => prev.filter(p => p.id !== id));
   }
 
   const handleCreateNewProfile = () => {
@@ -187,7 +198,7 @@ export const SuratLamaranView = () => {
   return (
     <div className="flex flex-col items-center w-full min-h-full pb-10 relative">
       
-      {/* --- MODAL EDIT --- */}
+      {/* --- MODAL EDIT TEXT --- */}
       {editModal.isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl p-6 border dark:border-zinc-800">
@@ -238,7 +249,7 @@ export const SuratLamaranView = () => {
             <AIGeneratorTab 
                 personalDetails={personalDetails}
                 onDetailChange={handleDetailChange}
-                // Props Lampiran Diteruskan ke sini
+                // Props Lampiran
                 attachments={attachments}
                 onToggleAttachment={toggleAttachment}
                 onUpdateAttachment={updateAttachmentText}
@@ -255,6 +266,10 @@ export const SuratLamaranView = () => {
                 onImportJson={handleImportJson}
                 onResetData={handleCreateNewProfile}
                 onSaveProfile={handleSaveCurrentProfile}
+                // Pass props for Profile Management in AI Tab
+                savedProfiles={savedProfiles}
+                setSavedProfiles={setSavedProfiles}
+                onLoadProfile={handleLoadProfile}
             />
         )}
       </div>
