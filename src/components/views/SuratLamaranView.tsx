@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
-  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, GripVertical, PlusCircle
+  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
@@ -11,7 +11,7 @@ interface DataRow {
   id: string;
   label: string;
   value: string;
-  isBold?: boolean; // Untuk menandai apakah value harus bold (seperti Nama)
+  isBold?: boolean;
 }
 
 interface UserProfile {
@@ -40,24 +40,34 @@ export const SuratLamaranView = () => {
     onSave: ((val: string) => void) | null;
   }>({ isOpen: false, label: '', text: '', onSave: null });
 
-  // --- STATE UTAMA (DINAMIS) ---
-  // 1. Header & Recipient
+  // --- STATE DATA SURAT ---
+  
+  // 1. Header
   const [headerData, setHeaderData] = useState({
     cityDate: 'Manado, 6 Februari 2026',
+    labelSubject: 'Perihal',
     subject: 'Lamaran Pekerjaan',
+    labelTo: 'Yth.',
     recipientTitle: 'Bapak/Ibu HRD',
     companyName: 'PT Teknologi Masa Depan',
     recipientAddress: 'di Tempat'
   });
 
-  // 2. Body Paragraphs (Array string agar bisa nambah/hapus)
+  // 2. Struktur & Kalimat Penghubung
+  const [structure, setStructure] = useState({
+    greeting: 'Dengan hormat,',
+    dataIntro: 'Adapun data diri saya sebagai berikut:',
+    attachmentIntro: 'Sebagai bahan pertimbangan, saya lampirkan:',
+  });
+
+  // 3. Paragraf Isi
   const [bodyParagraphs, setBodyParagraphs] = useState<string[]>([
     "Berdasarkan informasi yang saya peroleh, perusahaan yang Bapak/Ibu pimpin sedang membuka lowongan pekerjaan untuk posisi Frontend Developer.",
     "Melalui surat ini saya bermaksud untuk melamar pekerjaan dan bergabung dengan perusahaan Bapak/Ibu. Latar belakang pendidikan dan pengalaman saya di bidang teknologi sangat relevan dengan posisi tersebut.",
     "Saya memiliki kemampuan adaptasi yang cepat, disiplin, dan mampu bekerja dalam tim maupun individu."
   ]);
 
-  // 3. Data Diri (Array object agar bisa nambah/hapus baris tabel)
+  // 4. Tabel Data Diri
   const [personalDetails, setPersonalDetails] = useState<DataRow[]>([
     { id: '1', label: 'Nama', value: 'Frendy Rikal Gerung', isBold: true },
     { id: '2', label: 'Tempat, Tgl. Lahir', value: 'Raanan Baru, 22 Februari 2002' },
@@ -67,7 +77,7 @@ export const SuratLamaranView = () => {
     { id: '6', label: 'Email', value: 'frendegerung634@gmail.com' },
   ]);
 
-  // 4. Lampiran (Array string)
+  // 5. Lampiran
   const [attachments, setAttachments] = useState<string[]>([
     "Daftar Riwayat Hidup (CV)",
     "Portofolio",
@@ -75,7 +85,7 @@ export const SuratLamaranView = () => {
     "Pas Foto Terbaru"
   ]);
 
-  // 5. Closing & Signature
+  // 6. Penutup
   const [closingData, setClosingData] = useState({
     intro: "Besar harapan saya untuk dapat diberikan kesempatan wawancara agar dapat menjelaskan lebih mendalam mengenai potensi diri saya. Demikian surat lamaran ini saya buat, atas perhatian Bapak/Ibu saya ucapkan terima kasih.",
     greeting: "Hormat Saya,",
@@ -85,40 +95,34 @@ export const SuratLamaranView = () => {
   const [savedProfiles, setSavedProfiles] = useState<UserProfile[]>([]);
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   
-  // --- HELPERS ADD/DELETE/EDIT ---
-
-  // Helper: Buka Modal Edit
+  // --- HELPERS ---
   const openEdit = (label: string, initialText: string, onSaveHandler: (val: string) => void) => {
     if (!isEditMode) return;
     setEditModal({ isOpen: true, label, text: initialText, onSave: onSaveHandler });
   };
 
-  // Helper: Hapus Item Array
   const deleteItem = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number) => {
     if(!confirm("Hapus baris ini?")) return;
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Helper: Tambah Item Array
   const addItem = (type: 'paragraph' | 'detail' | 'attachment', index?: number) => {
     if (type === 'paragraph') {
       const newText = "Paragraf baru... (Klik untuk edit)";
       setBodyParagraphs(prev => {
         const arr = [...prev];
-        // Insert after index, or at end if undefined
         const insertIdx = index !== undefined ? index + 1 : arr.length;
         arr.splice(insertIdx, 0, newText);
         return arr;
       });
     } else if (type === 'detail') {
-      const newRow: DataRow = { id: Date.now().toString(), label: 'Label Baru', value: 'Isi Data...' };
-      setPersonalDetails(prev => [...prev, newRow]);
+      setPersonalDetails(prev => [...prev, { id: Date.now().toString(), label: 'Label Baru', value: 'Isi Data...' }]);
     } else if (type === 'attachment') {
       setAttachments(prev => [...prev, "Lampiran Baru..."]);
     }
   };
 
-  // --- LOGIC LOAD/SAVE PROFIL (TETAP ADA) ---
+  // --- LOGIC LAINNYA ---
   useEffect(() => {
     const stored = localStorage.getItem('userProfiles');
     if (stored) setSavedProfiles(JSON.parse(stored));
@@ -128,7 +132,6 @@ export const SuratLamaranView = () => {
     const selectedId = e.target.value;
     const selected = savedProfiles.find(p => p.id === selectedId);
     if (selected) {
-      // Map profile ke format dinamis tabel
       setPersonalDetails([
         { id: '1', label: 'Nama', value: selected.fullName, isBold: true },
         { id: '2', label: 'Tempat, Tgl. Lahir', value: selected.birthPlaceDate },
@@ -141,60 +144,19 @@ export const SuratLamaranView = () => {
     }
   };
 
-  // --- LOGIC AI IMPORT (DISESUAIKAN DENGAN STRUKTUR BARU) ---
-  const handleImportJson = () => {
-    try {
-      const cleanJson = jsonInput.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      
-      // Update basic fields
-      if (parsed.jobInfo) {
-        setHeaderData(prev => ({
-          ...prev,
-          cityDate: parsed.jobInfo.cityDate || prev.cityDate,
-          companyName: parsed.jobInfo.companyName || prev.companyName,
-          recipientTitle: parsed.jobInfo.destination || prev.recipientTitle,
-        }));
-        if(parsed.jobInfo.attachments) {
-            setAttachments(parsed.jobInfo.attachments.split(','));
-        }
-      }
-      
-      // Update Content paragraphs
-      if (parsed.letterContent) {
-        // Gabungkan paragraphOpening, Body, Closing menjadi array
-        const newParas = [];
-        if(parsed.letterContent.paragraphOpening) newParas.push(parsed.letterContent.paragraphOpening);
-        if(parsed.letterContent.paragraphBody) newParas.push(parsed.letterContent.paragraphBody);
-        setBodyParagraphs(newParas);
-
-        setClosingData(prev => ({
-            ...prev,
-            intro: parsed.letterContent.paragraphClosing || prev.intro
-        }));
-      }
-
-      alert("Surat diperbarui!"); setActiveTab('data');
-    } catch (error) {
-      alert("Gagal import JSON.");
-    }
-  };
-
-  // --- CANVAS & UTILS ---
   const handleSaveModal = () => { if (editModal.onSave) { editModal.onSave(editModal.text); setEditModal({ ...editModal, isOpen: false }); }};
-  const generateAIPrompt = () => { return `Buatkan surat lamaran kerja dalam format JSON... (Sama seperti sebelumnya)`; };
+  const handleImportJson = () => { alert("Gunakan prompt di tab AI Generator untuk membuat JSON, lalu paste di sini."); };
+  const generateAIPrompt = () => { return `Buatkan surat lamaran kerja profesional dalam format JSON...`; };
   const copyToClipboard = () => { navigator.clipboard.writeText(generateAIPrompt()); alert("Prompt disalin!"); };
   const adjust = (type: 'font' | 'line' | 'margin', val: number) => { setSettings(prev => { if (type === 'font') return { ...prev, fontSize: Math.max(10, Math.min(14, prev.fontSize + val)) }; if (type === 'line') return { ...prev, lineHeight: parseFloat((prev.lineHeight + val).toFixed(1)) }; return { ...prev, margin: parseFloat((prev.margin + val).toFixed(1)) }; }); };
-  
-  // Canvas Refs
+
+  // Canvas Logic
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragItemRef = useRef<HTMLImageElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-
-  // Canvas Logic (Singkat)
   const getPos = (e: any) => { const rect = canvasRef.current?.getBoundingClientRect(); return rect ? { x: (e.touches?e.touches[0].clientX:e.clientX)-rect.left, y: (e.touches?e.touches[0].clientY:e.clientY)-rect.top } : {x:0,y:0} };
   const startDrawing = (e: any) => { isDrawing.current = true; lastPos.current = getPos(e); };
   const draw = (e: any) => { if(!isDrawing.current || !canvasRef.current) return; const ctx=canvasRef.current.getContext('2d'); if(ctx){ if(e.touches)e.preventDefault(); const p=getPos(e); ctx.beginPath();ctx.moveTo(lastPos.current.x,lastPos.current.y);ctx.lineTo(p.x,p.y);ctx.stroke();lastPos.current=p; }};
@@ -264,11 +226,11 @@ export const SuratLamaranView = () => {
                     onClick={() => setIsEditMode(!isEditMode)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all shadow-sm text-sm border ${
                         isEditMode 
-                        ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-900/50 ring-2 ring-yellow-200 ring-offset-1' 
+                        ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/50 ring-2 ring-blue-200 ring-offset-1' 
                         : 'bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
                     }`}
                 >
-                    {isEditMode ? <ToggleRight size={20} className="text-yellow-600"/> : <ToggleLeft size={20}/>}
+                    {isEditMode ? <ToggleRight size={20} className="text-blue-600"/> : <ToggleLeft size={20}/>}
                     <span>{isEditMode ? 'Mode Edit: ON' : 'Mode Edit: OFF'}</span>
                 </button>
 
@@ -278,13 +240,12 @@ export const SuratLamaranView = () => {
             </div>
         </div>
 
-        {/* ISI TAB DATA */}
         {activeTab === 'data' && (
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
              <div className="space-y-4">
                 <div className="flex items-center justify-between"><h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><User size={16}/> Load Data Profil</h4><select onChange={handleLoadProfile} className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-1"><option value="">Pilih Profil...</option>{savedProfiles.map(p => <option key={p.id} value={p.id}>{p.profileName}</option>)}</select></div>
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-                   <strong>Tips:</strong> Aktifkan <strong>Mode Edit</strong> di atas untuk mengubah, menambah, atau menghapus baris surat secara langsung di tampilan kertas.
+                   <strong>Mode Edit Aktif:</strong> Klik pada kotak garis putus-putus di halaman surat untuk mengubah teks secara langsung.
                 </div>
              </div>
            </div>
@@ -308,69 +269,101 @@ export const SuratLamaranView = () => {
         style={{ width: '21cm', minHeight: '29.7cm', padding: `${settings.margin}cm`, fontSize: `${settings.fontSize}pt`, lineHeight: settings.lineHeight, fontFamily: '"Times New Roman", Times, serif' }}
       >
         <style jsx global>{`
-            .editable-highlight { @apply cursor-pointer relative rounded transition-all duration-200 hover:bg-yellow-50 outline-none decoration-yellow-300 ring-1 ring-transparent hover:ring-yellow-300; }
+            /* KOTAK PENANDA EDIT */
+            .editable-highlight { 
+                @apply cursor-pointer relative rounded border border-dashed border-zinc-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 px-1 -mx-1 py-0.5;
+            }
+            .editable-highlight:hover::after {
+                content: '✎';
+                @apply absolute -top-2 -right-2 text-[8px] bg-blue-500 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm pointer-events-none z-10;
+            }
+            
+            /* TOMBOL AKSI (HAPUS/TAMBAH) */
             .action-btn { @apply absolute hidden items-center justify-center w-6 h-6 rounded-full bg-white shadow-md border border-zinc-200 cursor-pointer z-20 hover:scale-110 transition-transform text-zinc-500 hover:text-red-500; }
             .editable-container:hover .action-btn { @apply flex; }
             .add-btn { @apply flex items-center justify-center gap-1 w-full py-1 mt-1 mb-2 border-2 border-dashed border-zinc-200 rounded-lg text-zinc-300 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition-all text-[10px] font-sans font-bold uppercase tracking-wider; }
-            @media print { .no-print, .action-btn, .add-btn { display: none !important; } }
+            
+            @media print { 
+                .no-print, .action-btn, .add-btn, .editable-highlight { border: none !important; background: none !important; padding: 0 !important; margin: 0 !important; }
+                .editable-highlight::after { display: none !important; }
+            }
         `}</style>
 
         <div className="page-container-print">
             {/* Header: Date */}
             <div className={`text-right mb-6 editable-container relative group`}>
-                <div 
+                <span 
                     className={isEditMode ? 'editable-highlight' : ''}
                     onClick={() => openEdit('Tanggal Surat', headerData.cityDate, (val) => setHeaderData({...headerData, cityDate: val}))}
                 >
                     {headerData.cityDate}
-                </div>
+                </span>
             </div>
 
             {/* Header: Recipient */}
-            <div className="text-left mb-8">
-                Perihal: 
-                <strong 
-                    className={`ml-1 ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Perihal', headerData.subject, (val) => setHeaderData({...headerData, subject: val}))}
-                >
-                    {headerData.subject}
-                </strong>
-                <br /><br />
+            <div className="text-left mb-8 space-y-1">
+                <div>
+                    <span 
+                        className={`mr-2 ${isEditMode ? 'editable-highlight' : ''}`}
+                        onClick={() => openEdit('Label Perihal', headerData.labelSubject, (val) => setHeaderData({...headerData, labelSubject: val}))}
+                    >
+                        {headerData.labelSubject}:
+                    </span>
+                    <strong 
+                        className={isEditMode ? 'editable-highlight' : ''}
+                        onClick={() => openEdit('Isi Perihal', headerData.subject, (val) => setHeaderData({...headerData, subject: val}))}
+                    >
+                        {headerData.subject}
+                    </strong>
+                </div>
                 
-                Yth.<br />
-                <strong 
-                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Penerima (Yth)', headerData.recipientTitle, (val) => setHeaderData({...headerData, recipientTitle: val}))}
-                >
-                    {headerData.recipientTitle}
-                </strong>
-                <strong 
-                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Nama Perusahaan', headerData.companyName, (val) => setHeaderData({...headerData, companyName: val}))}
-                >
-                    {headerData.companyName}
-                </strong>
-                <div 
-                    className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
-                    onClick={() => openEdit('Alamat Penerima', headerData.recipientAddress, (val) => setHeaderData({...headerData, recipientAddress: val}))}
-                >
-                    {headerData.recipientAddress}
+                <div className="pt-4">
+                    <span
+                        className={`block w-fit mb-1 ${isEditMode ? 'editable-highlight' : ''}`}
+                        onClick={() => openEdit('Label Yth', headerData.labelTo, (val) => setHeaderData({...headerData, labelTo: val}))}
+                    >
+                        {headerData.labelTo}
+                    </span>
+                    <strong 
+                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                        onClick={() => openEdit('Penerima', headerData.recipientTitle, (val) => setHeaderData({...headerData, recipientTitle: val}))}
+                    >
+                        {headerData.recipientTitle}
+                    </strong>
+                    <strong 
+                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                        onClick={() => openEdit('Nama Perusahaan', headerData.companyName, (val) => setHeaderData({...headerData, companyName: val}))}
+                    >
+                        {headerData.companyName}
+                    </strong>
+                    <div 
+                        className={`block w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                        onClick={() => openEdit('Alamat Penerima', headerData.recipientAddress, (val) => setHeaderData({...headerData, recipientAddress: val}))}
+                    >
+                        {headerData.recipientAddress}
+                    </div>
                 </div>
             </div>
 
             <div className="text-justify">
-                <p className="mb-4">Dengan hormat,</p>
+                {/* SALAM PEMBUKA */}
+                <p 
+                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Salam Pembuka', structure.greeting, (val) => setStructure({...structure, greeting: val}))}
+                >
+                    {structure.greeting}
+                </p>
 
-                {/* --- BODY PARAGRAPHS (DYNAMIC) --- */}
+                {/* BODY PARAGRAPHS */}
                 {bodyParagraphs.map((para, idx) => (
-                    <div key={idx} className="relative editable-container group">
+                    <div key={idx} className="relative editable-container group mb-4">
                         {isEditMode && (
                             <button onClick={() => deleteItem(setBodyParagraphs, idx)} className="action-btn -right-8 top-0" title="Hapus Paragraf">
                                 <Trash2 size={12} />
                             </button>
                         )}
                         <p 
-                            className={`mb-4 ${isEditMode ? 'editable-highlight ring-offset-2' : ''}`}
+                            className={`${isEditMode ? 'editable-highlight' : ''}`}
                             onClick={() => openEdit(`Paragraf ke-${idx+1}`, para, (val) => setBodyParagraphs(prev => { const n = [...prev]; n[idx] = val; return n; }))}
                         >
                             {para}
@@ -382,33 +375,38 @@ export const SuratLamaranView = () => {
                         )}
                     </div>
                 ))}
+                
+                {isEditMode && <button onClick={() => addItem('paragraph')} className="add-btn"><PlusCircle size={14} /> Tambah Paragraf</button>}
 
-                {/* ADD PARAGRAPH BUTTON (Jika kosong atau paling bawah) */}
-                {isEditMode && (
-                    <button onClick={() => addItem('paragraph')} className="add-btn">
-                        <PlusCircle size={14} /> Tambah Paragraf
-                    </button>
-                )}
+                {/* INTRO DATA DIRI */}
+                <p 
+                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Intro Data Diri', structure.dataIntro, (val) => setStructure({...structure, dataIntro: val}))}
+                >
+                    {structure.dataIntro}
+                </p>
 
-                <p className="mb-4">Adapun data diri saya sebagai berikut:</p>
-
-                {/* --- PERSONAL DATA (DYNAMIC TABLE) --- */}
+                {/* PERSONAL DATA TABLE */}
                 <table className="w-full border-collapse mb-4 mt-2">
                     <tbody>
                         {personalDetails.map((row, idx) => (
                             <tr key={row.id} className="relative editable-container group hover:bg-zinc-50/50">
-                                <td 
-                                    className={`w-40 font-bold align-top pb-1 ${isEditMode ? 'editable-highlight' : ''}`}
-                                    onClick={() => openEdit('Label Data', row.label, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].label = val; return n; }))}
-                                >
-                                    {row.label}
+                                <td className="w-40 align-top pb-1">
+                                    <span 
+                                        className={`font-bold ${isEditMode ? 'editable-highlight' : ''}`}
+                                        onClick={() => openEdit('Label Data', row.label, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].label = val; return n; }))}
+                                    >
+                                        {row.label}
+                                    </span>
                                 </td>
                                 <td className="w-4 align-top text-center">:</td>
-                                <td 
-                                    className={`align-top pb-1 ${isEditMode ? 'editable-highlight' : ''}`}
-                                    onClick={() => openEdit('Isi Data', row.value, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].value = val; return n; }))}
-                                >
-                                    {row.isBold ? <strong>{row.value}</strong> : row.value}
+                                <td className="align-top pb-1">
+                                    <span
+                                        className={`${isEditMode ? 'editable-highlight' : ''} ${row.isBold ? 'font-bold' : ''}`}
+                                        onClick={() => openEdit('Isi Data', row.value, (val) => setPersonalDetails(prev => { const n = [...prev]; n[idx].value = val; return n; }))}
+                                    >
+                                        {row.value}
+                                    </span>
                                 </td>
                                 {isEditMode && (
                                     <td className="w-8 align-middle text-right">
@@ -421,18 +419,20 @@ export const SuratLamaranView = () => {
                         ))}
                     </tbody>
                 </table>
-                {isEditMode && (
-                    <button onClick={() => addItem('detail')} className="add-btn">
-                        <PlusCircle size={14} /> Tambah Baris Data
-                    </button>
-                )}
+                {isEditMode && <button onClick={() => addItem('detail')} className="add-btn"><PlusCircle size={14} /> Tambah Baris Data</button>}
 
-                <p className="mb-4">Sebagai bahan pertimbangan, saya lampirkan:</p>
+                {/* INTRO LAMPIRAN */}
+                <p 
+                    className={`mb-4 w-fit ${isEditMode ? 'editable-highlight' : ''}`}
+                    onClick={() => openEdit('Intro Lampiran', structure.attachmentIntro, (val) => setStructure({...structure, attachmentIntro: val}))}
+                >
+                    {structure.attachmentIntro}
+                </p>
 
-                {/* --- ATTACHMENTS (DYNAMIC LIST) --- */}
+                {/* ATTACHMENTS */}
                 <ol className="list-decimal ml-6 pl-2 mb-4">
                     {attachments.map((item, idx) => (
-                         <li key={idx} className="relative editable-container group pl-1">
+                         <li key={idx} className="relative editable-container group pl-1 mb-1">
                             <span 
                                 className={`capitalize ${isEditMode ? 'editable-highlight' : ''}`}
                                 onClick={() => openEdit(`Lampiran ke-${idx+1}`, item, (val) => setAttachments(prev => { const n = [...prev]; n[idx] = val; return n; }))}
@@ -447,15 +447,11 @@ export const SuratLamaranView = () => {
                          </li>
                     ))}
                 </ol>
-                {isEditMode && (
-                    <button onClick={() => addItem('attachment')} className="add-btn">
-                        <PlusCircle size={14} /> Tambah Lampiran
-                    </button>
-                )}
+                {isEditMode && <button onClick={() => addItem('attachment')} className="add-btn"><PlusCircle size={14} /> Tambah Lampiran</button>}
 
-                {/* Closing Paragraph */}
+                {/* CLOSING PARAGRAPH */}
                 <p 
-                    className={`mb-4 ${isEditMode ? 'editable-highlight ring-offset-2' : ''}`}
+                    className={`mb-4 ${isEditMode ? 'editable-highlight' : ''}`}
                     onClick={() => openEdit('Paragraf Penutup', closingData.intro, (val) => setClosingData({...closingData, intro: val}))}
                 >
                     {closingData.intro}
