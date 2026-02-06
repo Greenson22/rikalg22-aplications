@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
-  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle, Save
+  ArrowDownToLine, Edit3, ToggleLeft, ToggleRight, X, PlusCircle, Save, FilePlus, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
@@ -16,9 +16,9 @@ interface DataRow {
 
 interface UserProfile {
   id: string;
-  profileName: string; // Nama profil simpanan (misal: "Profil Frendy Utama")
+  profileName: string; 
   fullName: string;
-  details: DataRow[]; // Menyimpan seluruh baris data (TTL, Alamat, dll)
+  details: DataRow[]; 
 }
 
 export const SuratLamaranView = () => {
@@ -27,12 +27,15 @@ export const SuratLamaranView = () => {
   const [jsonInput, setJsonInput] = useState(''); 
   const [settings, setSettings] = useState({ fontSize: 12, lineHeight: 1.4, margin: 2.5 });
   const [isEditMode, setIsEditMode] = useState(false);
+  
+  // State untuk toggle accordion detail data di tab AI
+  const [showDetailInputs, setShowDetailInputs] = useState(true);
 
   // --- STATE TARGET LAMARAN (Untuk AI Prompt) ---
   const [targetJob, setTargetJob] = useState({
     position: '',
     company: '',
-    requirements: '' // Opsional: skill khusus yang diminta lowongan
+    requirements: '' 
   });
 
   // --- STATE MODAL EDIT ---
@@ -142,13 +145,27 @@ export const SuratLamaranView = () => {
       id: Date.now().toString(),
       profileName,
       fullName: nameRow,
-      details: personalDetails // Simpan struktur tabel saat ini
+      details: personalDetails 
     };
 
     const updated = [...savedProfiles, newProfile];
     setSavedProfiles(updated);
     localStorage.setItem('userProfiles', JSON.stringify(updated));
     alert("Profil berhasil disimpan!");
+  };
+
+  const handleCreateNewProfile = () => {
+    if(!confirm("Buat data baru? Data yang belum disimpan akan hilang.")) return;
+    setPersonalDetails([
+        { id: '1', label: 'Nama', value: '', isBold: true },
+        { id: '2', label: 'Tempat, Tgl. Lahir', value: '' },
+        { id: '3', label: 'Pendidikan Terakhir', value: '' },
+        { id: '4', label: 'Alamat', value: '' },
+        { id: '5', label: 'No. Telepon', value: '' },
+        { id: '6', label: 'Email', value: '' },
+    ]);
+    setClosingData(prev => ({...prev, signerName: "[Nama Lengkap]"}));
+    setShowDetailInputs(true); // Pastikan form terbuka agar user bisa langsung ketik
   };
 
   const handleLoadProfile = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -166,6 +183,21 @@ export const SuratLamaranView = () => {
       setSavedProfiles(updated);
       localStorage.setItem('userProfiles', JSON.stringify(updated));
   }
+  
+  // Update data dari input field di tab AI
+  const handleDetailChange = (index: number, newValue: string) => {
+      setPersonalDetails(prev => {
+          const updated = [...prev];
+          updated[index].value = newValue;
+          return updated;
+      });
+
+      // Jika labelnya mengandung "nama", update juga di bagian tanda tangan
+      const row = personalDetails[index];
+      if (row.label.toLowerCase().includes('nama')) {
+          setClosingData(prev => ({ ...prev, signerName: newValue }));
+      }
+  };
 
   // --- LOGIC JSON & AI ---
   const handleSaveModal = () => { if (editModal.onSave) { editModal.onSave(editModal.text); setEditModal({ ...editModal, isOpen: false }); }};
@@ -178,14 +210,13 @@ export const SuratLamaranView = () => {
         if(data.details && Array.isArray(data.details)) setPersonalDetails(data.details);
         if(data.closing) setClosingData(prev => ({...prev, ...data.closing}));
         alert("Surat berhasil diperbarui dari JSON!");
-        setActiveTab('design'); // Pindah ke tampilan
+        setActiveTab('design'); 
       } catch (e) {
-        alert("Format JSON tidak valid. Pastikan Anda menyalin kode JSON dengan benar dari AI.");
+        alert("Format JSON tidak valid.");
       }
   };
 
   const generateDynamicPrompt = () => { 
-    // Mengambil data pribadi saat ini di tabel (Ditambahkan titik koma ;)
     const personalInfoString = personalDetails.map(d => `- ${d.label}: ${d.value}`).join('\n');
     const attachmentsString = attachments.join(', ');
 
@@ -359,20 +390,20 @@ INSTRUKSI:
           </div>
         )}
 
-        {/* --- BAGIAN AI (DIPERBARUI) --- */}
+        {/* --- BAGIAN AI (DIPERBARUI DENGAN INPUT FIELD) --- */}
         {activeTab === 'ai' && (
             <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* KOLOM KIRI: INPUT TARGET LAMARAN + PILIH PROFIL */}
+               {/* KOLOM KIRI */}
                <div className="space-y-4">
                   
-                  {/* --- FITUR BARU: PILIH PROFIL PELAMAR --- */}
+                  {/* --- CARD DATA PELAMAR --- */}
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
                       <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-3 text-sm">
-                          <User size={16} className="text-blue-500"/> 0. Pilih Data Pelamar
+                          <User size={16} className="text-blue-500"/> 0. Data Pelamar
                       </h4>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                           <p className="text-xs text-zinc-500">
-                              Data diri siapa yang ingin dimasukkan ke dalam Prompt AI?
+                              Pilih data atau edit langsung di bawah ini.
                           </p>
                           <select 
                             onChange={handleLoadProfile} 
@@ -386,11 +417,50 @@ INSTRUKSI:
                               ))}
                           </select>
                           
-                          {/* Preview Nama Aktif */}
-                          <div className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 p-2 rounded text-zinc-600 dark:text-zinc-400 mt-2 border border-zinc-200 dark:border-zinc-700">
-                             Data Aktif: <span className="font-bold text-zinc-900 dark:text-zinc-200">
-                                {personalDetails.find(d => d.label.toLowerCase().includes('nama'))?.value || "Belum ada nama"}
-                             </span>
+                          {/* TOMBOL AKSI */}
+                          <div className="flex gap-2">
+                             <button 
+                                onClick={handleCreateNewProfile}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-colors border border-zinc-200 dark:border-zinc-700"
+                             >
+                                <FilePlus size={14}/> Reset / Baru
+                             </button>
+                             <button 
+                                onClick={handleSaveCurrentProfile}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg text-xs font-bold transition-colors border border-blue-100 dark:border-blue-800"
+                             >
+                                <Save size={14}/> Simpan Profil
+                             </button>
+                          </div>
+
+                          {/* FORMULIR EDIT DATA DIRI (ACCORDION) */}
+                          <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-2">
+                              <button 
+                                onClick={() => setShowDetailInputs(!showDetailInputs)}
+                                className="flex items-center justify-between w-full text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors mb-2"
+                              >
+                                  <span>EDIT DETAIL DATA DIRI</span>
+                                  {showDetailInputs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                              </button>
+                              
+                              {showDetailInputs && (
+                                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                                      {personalDetails.map((detail, index) => (
+                                          <div key={detail.id} className="grid grid-cols-12 gap-2 items-center">
+                                              <label className="col-span-4 text-[10px] font-medium text-zinc-500 uppercase truncate" title={detail.label}>
+                                                  {detail.label}
+                                              </label>
+                                              <input 
+                                                  type="text" 
+                                                  value={detail.value}
+                                                  placeholder={`Isi ${detail.label}...`}
+                                                  onChange={(e) => handleDetailChange(index, e.target.value)}
+                                                  className="col-span-8 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-zinc-300"
+                                              />
+                                          </div>
+                                      ))}
+                                  </div>
+                              )}
                           </div>
                       </div>
                   </div>
