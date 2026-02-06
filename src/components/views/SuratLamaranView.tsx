@@ -1,6 +1,6 @@
 // src/components/views/SuratLamaranView.tsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Printer, Check, Upload, Settings2, User, Bot, ToggleLeft, ToggleRight, X, PlusCircle, Trash2, Plus } from 'lucide-react';
+import { Printer, Check, Settings2, User, Bot, ToggleLeft, ToggleRight, PlusCircle, Trash2 } from 'lucide-react';
 import { Button } from '../elements/Button';
 import { ProfileTab } from '../fragments/surat-control/ProfileTab';
 import { DesignTab } from '../fragments/surat-control/DesignTab';
@@ -111,23 +111,24 @@ export const SuratLamaranView = () => {
   const deleteAttachmentById = (id: string) => { if(confirm("Hapus?")) setAttachments(prev => prev.filter(a => a.id !== id)); };
   const addNewAttachment = () => setAttachments(prev => [...prev, { id: Date.now().toString(), text: "", isChecked: true }]);
 
-  // --- LOGIC: PROFILE MANAGEMENT ---
-  // Load initial
+  // --- LOGIC: PROFILE MANAGEMENT (UPDATED TO API) ---
+  
+  // 1. Load Data dari API saat pertama kali buka
   useEffect(() => { 
-    const stored = localStorage.getItem('userProfiles'); 
-    if (stored) setSavedProfiles(JSON.parse(stored)); 
+    fetch('/api/profiles')
+      .then(res => {
+        if (!res.ok) throw new Error("Gagal mengambil data");
+        return res.json();
+      })
+      .then(data => setSavedProfiles(data))
+      .catch(err => console.error("Error loading profiles:", err));
   }, []);
 
-  // Sync to localStorage whenever savedProfiles changes
-  useEffect(() => {
-    if (savedProfiles.length > 0) {
-       localStorage.setItem('userProfiles', JSON.stringify(savedProfiles));
-    }
-  }, [savedProfiles]);
-
-  const handleSaveCurrentProfile = () => {
+  // 2. Simpan Profil Baru ke Database
+  const handleSaveCurrentProfile = async () => {
     const profileName = prompt("Nama Profil:", "Profil Saya");
     if (!profileName) return;
+    
     const newProfile: UserProfile = {
       id: Date.now().toString(), 
       profileName, 
@@ -135,9 +136,23 @@ export const SuratLamaranView = () => {
       details: personalDetails, 
       attachments: attachments
     };
-    // localStorage sync handled by useEffect
-    setSavedProfiles(prev => [...prev, newProfile]);
-    alert("Tersimpan!");
+
+    try {
+      const res = await fetch('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProfile)
+      });
+
+      if (!res.ok) throw new Error("Gagal menyimpan");
+      
+      // Update state lokal
+      setSavedProfiles(prev => [...prev, newProfile]);
+      alert("Tersimpan ke Database!");
+    } catch (e) {
+      console.error(e);
+      alert("Gagal menyimpan ke database.");
+    }
   };
 
   const handleLoadProfile = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -149,13 +164,23 @@ export const SuratLamaranView = () => {
     }
   };
 
-  const handleDeleteProfile = (id: string) => {
-      if(!confirm("Hapus profil?")) return;
-      setSavedProfiles(prev => prev.filter(p => p.id !== id));
+  // 3. Hapus Profil dari Database
+  const handleDeleteProfile = async (id: string) => {
+      if(!confirm("Hapus profil ini dari database?")) return;
+      
+      try {
+        const res = await fetch(`/api/profiles?id=${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error("Gagal menghapus");
+
+        setSavedProfiles(prev => prev.filter(p => p.id !== id));
+      } catch (e) {
+        console.error(e);
+        alert("Gagal menghapus data.");
+      }
   }
 
   const handleCreateNewProfile = () => {
-      if(!confirm("Reset Data?")) return;
+      if(!confirm("Reset Data inputan saat ini?")) return;
       setPersonalDetails([{ id: '1', label: 'Nama', value: '', isBold: true }, { id: '2', label: 'No. HP', value: '' }]); 
       setAttachments([{ id: '1', text: "CV", isChecked: true }]);
   };

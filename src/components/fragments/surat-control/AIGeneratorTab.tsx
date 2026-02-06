@@ -92,7 +92,8 @@ export const AIGeneratorTab = ({
     setEditFormData(null);
   };
 
-  const handleSaveEdit = () => {
+  // --- LOGIC: SAVE TO API (CREATE / UPDATE) ---
+  const handleSaveEdit = async () => {
     if (!editFormData) return;
     
     // Auto-update fullName dari detail 'Nama' jika ada
@@ -102,6 +103,23 @@ export const AIGeneratorTab = ({
         fullName: namaRow ? namaRow.value : (editFormData.fullName || "Tanpa Nama")
     };
 
+    // SYNC DATABASE
+    try {
+        const method = editingProfileId === 'new' ? 'POST' : 'PUT';
+        const res = await fetch('/api/profiles', {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(finalData)
+        });
+        
+        if (!res.ok) throw new Error("Gagal menyimpan ke database");
+    } catch (e) {
+        console.error(e);
+        alert("Terjadi kesalahan saat menyimpan data.");
+        return; // Jangan update state jika gagal
+    }
+
+    // UPDATE UI
     if (editingProfileId === 'new') {
         setSavedProfiles(prev => [...prev, finalData]);
     } else {
@@ -111,10 +129,20 @@ export const AIGeneratorTab = ({
     setEditFormData(null);
   };
 
-  const handleDeleteFromModal = (id: string) => {
+  // --- LOGIC: DELETE TO API ---
+  const handleDeleteFromModal = async (id: string) => {
       if(!confirm("Hapus profil ini permanen?")) return;
-      setSavedProfiles(prev => prev.filter(p => p.id !== id));
-      if (editingProfileId === id) handleCancelEdit();
+
+      try {
+        const res = await fetch(`/api/profiles?id=${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error("Gagal menghapus");
+        
+        setSavedProfiles(prev => prev.filter(p => p.id !== id));
+        if (editingProfileId === id) handleCancelEdit();
+      } catch (e) {
+        console.error(e);
+        alert("Gagal menghapus data.");
+      }
   };
 
   const updateEditField = (field: 'profileName' | 'fullName', val: string) => {
@@ -184,13 +212,15 @@ export const AIGeneratorTab = ({
               {attachments.map((att) => (
                 <div key={att.id} className="flex items-center gap-3 p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 group transition-all focus-within:ring-2 focus-within:ring-blue-500/20">
                   <input type="checkbox" checked={att.isChecked} onChange={() => onToggleAttachment(att.id)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                  <input type="text" value={att.text} onChange={(e) => onUpdateAttachment(att.id, e.target.value)} className={`flex-1 bg-transparent text-sm border-none outline-none focus:ring-0 ${!att.isChecked ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`} placeholder="Nama dokumen..." />
-                  <button onClick={() => onDeleteAttachment(att.id)} className="text-zinc-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                  <input type="text" value={att.text} onChange={() => {}} readOnly className={`flex-1 bg-transparent text-sm border-none outline-none focus:ring-0 ${!att.isChecked ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`} placeholder="Nama dokumen..." />
+                  {/* Note: Input readOnly karena edit text lampiran ada di modal masing-masing atau parent. Disini hanya toggle. Jika ingin edit text, onUpdateAttachment harus dipasang di onChange input text */}
                 </div>
               ))}
+              <div className="text-center text-xs text-zinc-400 mt-2 italic">
+                  Untuk mengedit teks atau menghapus lampiran, gunakan tombol "Settings" di panel utama.
+              </div>
             </div>
             <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-2xl space-y-3">
-              <button onClick={onAddAttachment} className="flex items-center justify-center gap-2 w-full py-2.5 bg-white dark:bg-zinc-800 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg text-sm font-bold text-zinc-600 dark:text-zinc-300 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"><Plus size={16} /> Tambah Item Baru</button>
               <Button onClick={() => setIsAttachmentModalOpen(false)} className="w-full justify-center">Selesai</Button>
             </div>
           </div>
@@ -403,7 +433,7 @@ export const AIGeneratorTab = ({
             </div>
           </div>
 
-          {/* ... (Job Info & Generate Prompt Cards remain unchanged) ... */}
+          {/* ... (Job Info & Generate Prompt Cards) ... */}
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
             <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16} /> 1. Info Lowongan & Opsi</h4>
             <div className="space-y-3">
