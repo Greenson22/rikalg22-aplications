@@ -5,7 +5,7 @@ import { Button } from '../elements/Button';
 import { ProfileTab } from '../fragments/surat-control/ProfileTab';
 import { DesignTab } from '../fragments/surat-control/DesignTab';
 import { AIGeneratorTab } from '../fragments/surat-control/AIGeneratorTab';
-import { DataRow, AttachmentItem, UserProfile } from '../../types/surat'; // Import types
+import { DataRow, AttachmentItem, UserProfile } from '../../types/surat'; 
 
 export const SuratLamaranView = () => {
   // --- STATE CONTROL PANEL ---
@@ -145,7 +145,7 @@ export const SuratLamaranView = () => {
 
   const handleCreateNewProfile = () => {
       if(!confirm("Reset Data?")) return;
-      setPersonalDetails([{ id: '1', label: 'Nama', value: '', isBold: true }, { id: '2', label: 'No. HP', value: '' }]); // Simplified reset
+      setPersonalDetails([{ id: '1', label: 'Nama', value: '', isBold: true }, { id: '2', label: 'No. HP', value: '' }]); 
       setAttachments([{ id: '1', text: "CV", isChecked: true }]);
   };
 
@@ -175,7 +175,7 @@ export const SuratLamaranView = () => {
       } catch(e) { alert("Invalid JSON"); }
   };
 
-  // --- SIGNATURE CANVAS LOGIC (Tetap di sini atau dipisah lagi nanti) ---
+  // --- SIGNATURE CANVAS LOGIC ---
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const startDrawing = (e: any) => { isDrawing.current = true; const ctx=canvasRef.current?.getContext('2d'); if(ctx) { ctx.beginPath(); ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY); } };
@@ -187,7 +187,7 @@ export const SuratLamaranView = () => {
   return (
     <div className="flex flex-col items-center w-full min-h-full pb-10 relative">
       
-      {/* --- MODAL EDIT (Tetap di sini karena global) --- */}
+      {/* --- MODAL EDIT --- */}
       {editModal.isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl p-6 border dark:border-zinc-800">
@@ -227,11 +227,6 @@ export const SuratLamaranView = () => {
                 onLoadProfile={handleLoadProfile}
                 onSaveCurrentProfile={handleSaveCurrentProfile}
                 onDeleteProfile={handleDeleteProfile}
-                attachments={attachments}
-                onToggleAttachment={toggleAttachment}
-                onUpdateAttachment={updateAttachmentText}
-                onDeleteAttachment={deleteAttachmentById}
-                onAddAttachment={addNewAttachment}
             />
         )}
 
@@ -243,8 +238,13 @@ export const SuratLamaranView = () => {
             <AIGeneratorTab 
                 personalDetails={personalDetails}
                 onDetailChange={handleDetailChange}
+                // Props Lampiran Diteruskan ke sini
                 attachments={attachments}
                 onToggleAttachment={toggleAttachment}
+                onUpdateAttachment={updateAttachmentText}
+                onDeleteAttachment={deleteAttachmentById}
+                onAddAttachment={addNewAttachment}
+                
                 targetJob={targetJob}
                 setTargetJob={setTargetJob}
                 promptLength={promptLength}
@@ -276,7 +276,7 @@ export const SuratLamaranView = () => {
             <span className={isEditMode ? 'editable-highlight' : ''} onClick={() => openEdit('Tanggal', headerData.cityDate, (val) => setHeaderData({...headerData, cityDate: val}))}>{headerData.cityDate}</span>
         </div>
 
-        {/* Content Body (Simplified for brevity, use same structure as before) */}
+        {/* Content Body */}
         <div className="text-left mb-8 space-y-1">
              <div><span className="mr-2">{headerData.labelSubject}:</span><strong className={isEditMode ? 'editable-highlight' : ''} onClick={() => openEdit('Subject', headerData.subject, v=>setHeaderData({...headerData, subject: v}))}>{headerData.subject}</strong></div>
              <div className="pt-4">
