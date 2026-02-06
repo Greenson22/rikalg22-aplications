@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
-  Settings2, Plus, Minus, User, Briefcase, Bot, Copy, Save
+  Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
+  ArrowDownToLine
 } from 'lucide-react';
-import { Button } from '../elements/Button'; // Pastikan path import sesuai
+import { Button } from '../elements/Button';
 
-// Interface untuk Data Diri
+// --- INTERFACES ---
 interface UserProfile {
   id: string;
-  profileName: string; // Nama simpanan profil (misal: "Frendy - Formal")
+  profileName: string;
   fullName: string;
   birthPlaceDate: string;
   education: string;
@@ -17,24 +18,30 @@ interface UserProfile {
   email: string;
 }
 
-// Interface untuk Info Lowongan
 interface JobInfo {
-  destination: string; // Yth...
-  companyName: string; // PP BRI Manado
-  position: string; // Financial Advisor
-  cityDate: string; // Manado, 5 Februari 2026
-  attachments: string; // Surat, CV, KTP (dipisah koma)
+  cityDate: string;
+  destination: string;
+  companyName: string;
+  position: string;
+  attachments: string;
+}
+
+interface LetterContent {
+  paragraphOpening: string;
+  paragraphBody: string;
+  paragraphClosing: string;
 }
 
 export const SuratLamaranView = () => {
   // --- STATE CONTROL PANEL ---
   const [activeTab, setActiveTab] = useState<'design' | 'data' | 'ai'>('data');
+  const [jsonInput, setJsonInput] = useState(''); // Untuk menampung input JSON dari user
   
   // State Pengaturan Tampilan
   const [settings, setSettings] = useState({
     fontSize: 12,
     lineHeight: 1.4,
-    margin: 2.0
+    margin: 2.5
   });
 
   // State Data Diri (Default)
@@ -51,14 +58,21 @@ export const SuratLamaranView = () => {
 
   // State Data Pekerjaan
   const [jobData, setJobData] = useState<JobInfo>({
+    cityDate: 'Manado, 6 Februari 2026',
     destination: 'Bapak/Ibu HRD',
-    companyName: 'PP BRI Manado',
-    position: 'Financial Advisor',
-    cityDate: 'Manado, 5 Februari 2026',
-    attachments: 'Surat Lamaran, CV, Fotokopi Ijazah, Transkrip Nilai, Pas Foto'
+    companyName: 'PT Teknologi Masa Depan',
+    position: 'Frontend Developer',
+    attachments: 'Surat Lamaran, CV, Portofolio, Ijazah'
   });
 
-  // State Profil Tersimpan (Disimulasikan dengan LocalStorage nanti)
+  // State Isi Surat (Supaya bisa diganti AI)
+  const [letterContent, setLetterContent] = useState<LetterContent>({
+    paragraphOpening: "Berdasarkan informasi yang saya peroleh, perusahaan yang Bapak/Ibu pimpin sedang membuka lowongan pekerjaan.",
+    paragraphBody: "Melalui surat ini saya bermaksud untuk melamar pekerjaan dan bergabung dengan perusahaan Bapak/Ibu. Latar belakang pendidikan dan pengalaman saya di bidang teknologi sangat relevan dengan posisi tersebut. Saya memiliki kemampuan adaptasi yang cepat, disiplin, dan mampu bekerja dalam tim maupun individu.",
+    paragraphClosing: "Besar harapan saya untuk dapat diberikan kesempatan wawancara agar dapat menjelaskan lebih mendalam mengenai potensi diri saya. Demikian surat lamaran ini saya buat, atas perhatian Bapak/Ibu saya ucapkan terima kasih."
+  });
+
+  // State Profil Tersimpan
   const [savedProfiles, setSavedProfiles] = useState<UserProfile[]>([]);
 
   // State Tanda Tangan
@@ -73,11 +87,8 @@ export const SuratLamaranView = () => {
 
   // --- LOGIC LOAD/SAVE PROFIL ---
   useEffect(() => {
-    // Load profiles from local storage on mount
     const stored = localStorage.getItem('userProfiles');
-    if (stored) {
-      setSavedProfiles(JSON.parse(stored));
-    }
+    if (stored) setSavedProfiles(JSON.parse(stored));
   }, []);
 
   const handleSaveProfile = () => {
@@ -94,42 +105,67 @@ export const SuratLamaranView = () => {
   const handleLoadProfile = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const selected = savedProfiles.find(p => p.id === selectedId);
-    if (selected) {
-      setUserData(selected);
-    }
+    if (selected) setUserData(selected);
   };
 
-  // --- LOGIC AI PROMPT GENERATOR ---
+  // --- LOGIC AI JSON GENERATOR & IMPORT ---
+  // Fix: Menggunakan kurung kurawal { ... } karena ada keyword 'return'
   const generateAIPrompt = () => {
-    const lampiranList = jobData.attachments.split(',').map(item => `- ${item.trim()}`).join('\n');
-    return `Bertindaklah sebagai pelamar kerja profesional. Buatkan saya surat lamaran kerja yang sopan dan meyakinkan.
+    return `Bertindaklah sebagai asisten karir profesional. Saya ingin melamar pekerjaan dan membutuhkan surat lamaran yang personal dan profesional.
     
-Detail Pelamar:
+Gunakan data saya berikut ini sebagai dasar:
 - Nama: ${userData.fullName}
 - TTL: ${userData.birthPlaceDate}
 - Pendidikan: ${userData.education}
 - Alamat: ${userData.address}
 - Kontak: ${userData.phone} / ${userData.email}
 
-Detail Lamaran:
-- Posisi dilamar: ${jobData.position}
-- Perusahaan tujuan: ${jobData.companyName}
-- Penerima surat: ${jobData.destination}
-- Lokasi & Tanggal Surat: ${jobData.cityDate}
+Tugas Anda:
+1. Lengkapi data lamaran (posisi, perusahaan, tanggal, dll) dengan data dummy yang relevan JIKA saya belum mengisinya, atau gunakan data yang logis.
+2. Buat isi surat (paragraf pembuka, inti, penutup) yang meyakinkan, sopan, dan sesuai dengan posisi yang dilamar.
 
-Lampiran yang disertakan:
-${lampiranList}
+PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json) dengan struktur berikut agar bisa saya import ke aplikasi saya:
 
-Instruksi Tambahan:
-Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidikan saya mendukung posisi tersebut.`;
+{
+  "jobInfo": {
+    "cityDate": "Kota, Tanggal Surat (misal: Jakarta, 20 Februari 2026)",
+    "destination": "Penerima (misal: Bapak/Ibu HRD)",
+    "companyName": "Nama Perusahaan Tujuan",
+    "position": "Posisi yang Dilamar",
+    "attachments": "Daftar lampiran dipisah koma"
+  },
+  "letterContent": {
+    "paragraphOpening": "Kalimat pembuka yang menyebutkan sumber info lowongan...",
+    "paragraphBody": "Paragraf inti yang menjelaskan skill, pengalaman, dan motivasi...",
+    "paragraphClosing": "Kalimat penutup yang berisi harapan wawancara..."
+  }
+}`;
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(generateAIPrompt());
-    alert("Prompt AI berhasil disalin! Silakan paste ke Gemini/ChatGPT.");
+    alert("Prompt disalin! Paste ke AI, lalu copy JSON balasannya ke kotak input di bawah.");
   };
 
-  // --- LOGIC TAMPILAN & CANVAS (Existing) ---
+  const handleImportJson = () => {
+    try {
+      // Membersihkan string json jika ada markdown block code
+      const cleanJson = jsonInput.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      
+      if (parsed.jobInfo) setJobData({ ...jobData, ...parsed.jobInfo });
+      if (parsed.letterContent) setLetterContent({ ...letterContent, ...parsed.letterContent });
+      
+      alert("Surat berhasil diperbarui dari JSON AI!");
+      setJsonInput(''); // Clear input
+      setActiveTab('data'); // Kembali ke tab data/preview
+    } catch (error) {
+      alert("Gagal import JSON. Pastikan format dari AI sudah benar dan valid JSON.");
+      console.error(error);
+    }
+  };
+
+  // --- LOGIC TAMPILAN & CANVAS ---
   const adjust = (type: 'font' | 'line' | 'margin', val: number) => {
     setSettings(prev => {
       let newValue;
@@ -163,40 +199,20 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    isDrawing.current = true;
-    const p = getPos(e);
-    lastPos.current = p;
-  };
-
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => { isDrawing.current = true; lastPos.current = getPos(e); };
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
     if ('touches' in e) e.preventDefault();
     const p = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
     lastPos.current = p;
   };
-
   const stopDrawing = () => { isDrawing.current = false; };
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    setSignatureImage(null);
-  };
-  const useSignature = () => {
-    if (canvasRef.current) setSignatureImage(canvasRef.current.toDataURL('image/png'));
-  };
+  const clearCanvas = () => { const ctx = canvasRef.current?.getContext('2d'); ctx?.clearRect(0, 0, 300, 100); setSignatureImage(null); };
+  const useSignature = () => { if (canvasRef.current) setSignatureImage(canvasRef.current.toDataURL('image/png')); };
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const reader = new FileReader();
@@ -204,10 +220,7 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
       reader.readAsDataURL(e.target.files[0]);
     }
   };
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); setIsDragging(true); };
 
   useEffect(() => {
     const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
@@ -215,198 +228,169 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
       const parentRect = dragItemRef.current.parentElement?.getBoundingClientRect();
       if (!parentRect) return;
       let clientX, clientY;
-      if ('touches' in e) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-      } else {
-          clientX = (e as MouseEvent).clientX;
-          clientY = (e as MouseEvent).clientY;
-      }
-      const x = clientX - parentRect.left - (dragItemRef.current.width / 2);
-      const y = clientY - parentRect.top - (dragItemRef.current.height / 2);
-      setPosition({ x, y });
+      if ('touches' in e) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; } 
+      else { clientX = (e as MouseEvent).clientX; clientY = (e as MouseEvent).clientY; }
+      setPosition({ x: clientX - parentRect.left - (dragItemRef.current.width / 2), y: clientY - parentRect.top - (dragItemRef.current.height / 2) });
     };
     const handleGlobalUp = () => setIsDragging(false);
     if (isDragging) {
-      window.addEventListener('mousemove', handleGlobalMove);
-      window.addEventListener('mouseup', handleGlobalUp);
-      window.addEventListener('touchmove', handleGlobalMove, { passive: false });
-      window.addEventListener('touchend', handleGlobalUp);
+      window.addEventListener('mousemove', handleGlobalMove); window.addEventListener('mouseup', handleGlobalUp);
+      window.addEventListener('touchmove', handleGlobalMove, { passive: false }); window.addEventListener('touchend', handleGlobalUp);
     }
     return () => {
-      window.removeEventListener('mousemove', handleGlobalMove);
-      window.removeEventListener('mouseup', handleGlobalUp);
-      window.removeEventListener('touchmove', handleGlobalMove);
-      window.removeEventListener('touchend', handleGlobalUp);
+      window.removeEventListener('mousemove', handleGlobalMove); window.removeEventListener('mouseup', handleGlobalUp);
+      window.removeEventListener('touchmove', handleGlobalMove); window.removeEventListener('touchend', handleGlobalUp);
     };
   }, [isDragging]);
 
   return (
     <div className="flex flex-col items-center w-full min-h-full pb-10">
       
-      {/* --- CONTROL PANEL (Redesigned) --- */}
+      {/* --- CONTROL PANEL --- */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm p-6 mb-8 w-full max-w-5xl print:hidden transition-all">
         
-        {/* Header Control Panel & Tabs */}
+        {/* Header Tabs */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4">
-            <div className="flex items-center gap-4 overflow-x-auto">
-                <button 
-                  onClick={() => setActiveTab('data')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'data' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
-                >
-                  <User size={18} /> Data Diri
-                </button>
-                <button 
-                  onClick={() => setActiveTab('design')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'design' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
-                >
-                  <Settings2 size={18} /> Tampilan
-                </button>
-                <button 
-                  onClick={() => setActiveTab('ai')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'ai' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
-                >
-                  <Bot size={18} /> AI Prompt
-                </button>
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'data', icon: User, label: 'Data Diri' },
+                  { id: 'design', icon: Settings2, label: 'Tampilan' },
+                  { id: 'ai', icon: Bot, label: 'AI Generator' },
+                ].map((tab) => (
+                  <button 
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                      activeTab === tab.id 
+                      ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' 
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    <tab.icon size={18} /> {tab.label}
+                  </button>
+                ))}
             </div>
             
             <button 
                 onClick={() => window.print()} 
-                className="flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 hover:dark:bg-zinc-100 px-5 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95 text-sm"
+                className="flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 px-5 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95 text-sm whitespace-nowrap"
             >
                 <Printer size={18} /> 
-                <span>Cetak / PDF</span>
+                <span>Cetak PDF</span>
             </button>
         </div>
 
-        {/* --- TAB CONTENT: DATA DIRI --- */}
+        {/* --- TAB: DATA DIRI --- */}
         {activeTab === 'data' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-             {/* Kolom Kiri: Profil Pelamar */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><User size={16}/> Informasi Pelamar</h4>
-                  
-                  {/* Dropdown Load Profile */}
                   <select 
                     onChange={handleLoadProfile}
                     className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-1 outline-none dark:bg-zinc-800 dark:border-zinc-700"
                   >
-                    <option value="">Pilih Profil Tersimpan...</option>
-                    {savedProfiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.profileName}</option>
-                    ))}
+                    <option value="">Pilih Profil...</option>
+                    {savedProfiles.map(p => <option key={p.id} value={p.id}>{p.profileName}</option>)}
                   </select>
                 </div>
-
                 <div className="grid grid-cols-1 gap-3">
                    <input type="text" placeholder="Nama Lengkap" value={userData.fullName} onChange={e => setUserData({...userData, fullName: e.target.value})} className="input-field" />
                    <input type="text" placeholder="Tempat, Tanggal Lahir" value={userData.birthPlaceDate} onChange={e => setUserData({...userData, birthPlaceDate: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Pendidikan Terakhir" value={userData.education} onChange={e => setUserData({...userData, education: e.target.value})} className="input-field" />
+                   <input type="text" placeholder="Pendidikan" value={userData.education} onChange={e => setUserData({...userData, education: e.target.value})} className="input-field" />
                    <input type="text" placeholder="Alamat" value={userData.address} onChange={e => setUserData({...userData, address: e.target.value})} className="input-field" />
                    <div className="grid grid-cols-2 gap-3">
                       <input type="text" placeholder="No. Telepon" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} className="input-field" />
                       <input type="text" placeholder="Email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} className="input-field" />
                    </div>
-                   <Button variant="ghost" onClick={handleSaveProfile} className="w-full mt-2 border border-dashed border-zinc-300">
-                      <Save size={16} /> Simpan Profil Ini
+                   <Button variant="ghost" onClick={handleSaveProfile} className="w-full mt-2 border border-dashed border-zinc-300 text-xs h-8">
+                      Simpan Profil Ini
                    </Button>
                 </div>
              </div>
 
-             {/* Kolom Kanan: Informasi Lowongan */}
              <div className="space-y-4">
                 <h4 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2"><Briefcase size={16}/> Informasi Lowongan</h4>
                 <div className="grid grid-cols-1 gap-3">
                    <div className="grid grid-cols-2 gap-3">
-                      <input type="text" placeholder="Kota, Tanggal Surat" value={jobData.cityDate} onChange={e => setJobData({...jobData, cityDate: e.target.value})} className="input-field" />
+                      <input type="text" placeholder="Kota, Tgl" value={jobData.cityDate} onChange={e => setJobData({...jobData, cityDate: e.target.value})} className="input-field" />
                       <input type="text" placeholder="Tujuan (Yth...)" value={jobData.destination} onChange={e => setJobData({...jobData, destination: e.target.value})} className="input-field" />
                    </div>
-                   <input type="text" placeholder="Nama Perusahaan" value={jobData.companyName} onChange={e => setJobData({...jobData, companyName: e.target.value})} className="input-field" />
-                   <input type="text" placeholder="Posisi yang Dilamar" value={jobData.position} onChange={e => setJobData({...jobData, position: e.target.value})} className="input-field" />
-                   
-                   <div>
-                     <label className="text-xs text-zinc-500 mb-1 block">Lampiran (pisahkan dengan koma)</label>
-                     <textarea 
-                        rows={3}
-                        placeholder="Contoh: CV, Ijazah, KTP" 
-                        value={jobData.attachments} 
-                        onChange={e => setJobData({...jobData, attachments: e.target.value})} 
-                        className="input-field resize-none" 
-                     />
+                   <input type="text" placeholder="Perusahaan" value={jobData.companyName} onChange={e => setJobData({...jobData, companyName: e.target.value})} className="input-field" />
+                   <input type="text" placeholder="Posisi" value={jobData.position} onChange={e => setJobData({...jobData, position: e.target.value})} className="input-field" />
+                   <textarea rows={3} placeholder="Lampiran (koma)" value={jobData.attachments} onChange={e => setJobData({...jobData, attachments: e.target.value})} className="input-field resize-none" />
+                </div>
+             </div>
+          </div>
+        )}
+
+        {/* --- TAB: TAMPILAN --- */}
+        {activeTab === 'design' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
+             {[
+               { label: 'Ukuran Huruf', type: 'font' as const, val: settings.fontSize, unit: 'pt', step: 1, icon: Type, color: 'text-blue-500' },
+               { label: 'Spasi Baris', type: 'line' as const, val: settings.lineHeight, unit: '', step: 0.1, icon: AlignJustify, color: 'text-indigo-500' },
+               { label: 'Margin', type: 'margin' as const, val: settings.margin, unit: 'cm', step: 0.2, icon: Move, color: 'text-emerald-500' },
+             ].map((ctrl, idx) => (
+                <div key={idx} className="space-y-3">
+                  <div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      <span className="flex items-center gap-2"><ctrl.icon size={16} className={ctrl.color}/> {ctrl.label}</span>
+                      <span className="badge">{ctrl.val}{ctrl.unit}</span>
+                  </div>
+                  <div className="control-buttons">
+                      <button onClick={() => adjust(ctrl.type, -ctrl.step)}><Minus size={16}/></button>
+                      <div className="separator"></div>
+                      <button onClick={() => adjust(ctrl.type, ctrl.step)}><Plus size={16}/></button>
+                  </div>
+                </div>
+             ))}
+          </div>
+        )}
+
+        {/* --- TAB: AI GENERATOR (NEW JSON MODE) --- */}
+        {activeTab === 'ai' && (
+          <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 md:grid-cols-2 gap-6">
+             {/* Kiri: Generate Prompt */}
+             <div className="space-y-3">
+                <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
+                   <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2 text-sm">
+                     1. Buat Prompt
+                   </h4>
+                   <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
+                     Salin instruksi ini ke Gemini/ChatGPT agar mereka membuatkan data surat dalam format JSON.
+                   </p>
+                   <div className="relative">
+                     <textarea readOnly value={generateAIPrompt()} className="w-full h-32 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none" />
+                     <button onClick={copyToClipboard} className="absolute top-2 right-2 bg-white p-1.5 rounded-md shadow-sm border border-zinc-200 hover:bg-zinc-50 text-zinc-600" title="Copy">
+                        <Copy size={14} />
+                     </button>
                    </div>
                 </div>
              </div>
-          </div>
-        )}
 
-        {/* --- TAB CONTENT: TAMPILAN --- */}
-        {activeTab === 'design' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-             {/* Font Size */}
-             <div className="control-group">
-                <div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    <span className="flex items-center gap-2"><Type size={16} className="text-blue-500"/> Ukuran Huruf</span>
-                    <span className="badge">{settings.fontSize}pt</span>
+             {/* Kanan: Import JSON */}
+             <div className="space-y-3">
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full flex flex-col">
+                   <h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm">
+                     2. Import JSON dari AI
+                   </h4>
+                   <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">
+                     Paste balasan JSON dari AI di sini untuk mengisi surat otomatis.
+                   </p>
+                   <textarea 
+                      value={jsonInput}
+                      onChange={(e) => setJsonInput(e.target.value)}
+                      placeholder='Paste JSON di sini... Contoh: { "jobInfo": { ... } }'
+                      className="w-full flex-1 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                   />
+                   <button 
+                      onClick={handleImportJson}
+                      disabled={!jsonInput}
+                      className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+                   >
+                      <ArrowDownToLine size={16} /> Terapkan ke Surat
+                   </button>
                 </div>
-                <div className="control-buttons">
-                    <button onClick={() => adjust('font', -1)}><Minus size={16}/></button>
-                    <div className="separator"></div>
-                    <button onClick={() => adjust('font', 1)}><Plus size={16}/></button>
-                </div>
-             </div>
-             {/* Line Height */}
-             <div className="control-group">
-                <div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    <span className="flex items-center gap-2"><AlignJustify size={16} className="text-indigo-500"/> Spasi Baris</span>
-                    <span className="badge">{settings.lineHeight}</span>
-                </div>
-                <div className="control-buttons">
-                    <button onClick={() => adjust('line', -0.1)}><Minus size={16}/></button>
-                    <div className="separator"></div>
-                    <button onClick={() => adjust('line', 0.1)}><Plus size={16}/></button>
-                </div>
-             </div>
-             {/* Margin */}
-             <div className="control-group">
-                <div className="flex justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    <span className="flex items-center gap-2"><Move size={16} className="text-emerald-500"/> Margin</span>
-                    <span className="badge">{settings.margin}cm</span>
-                </div>
-                <div className="control-buttons">
-                    <button onClick={() => adjust('margin', -0.2)}><Minus size={16}/></button>
-                    <div className="separator"></div>
-                    <button onClick={() => adjust('margin', 0.2)}><Plus size={16}/></button>
-                </div>
-             </div>
-          </div>
-        )}
-
-        {/* --- TAB CONTENT: AI PROMPT --- */}
-        {activeTab === 'ai' && (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-             <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4 mb-4">
-               <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2">
-                 <Bot size={20}/> AI Generator Assistant
-               </h4>
-               <p className="text-sm text-purple-600 dark:text-purple-400 mb-4">
-                 Salin prompt di bawah ini, lalu tempel (paste) ke Gemini, ChatGPT, atau Claude untuk membuatkan isi surat lamaran yang lebih variatif berdasarkan data yang sudah Anda isi.
-               </p>
-               
-               <div className="relative">
-                 <textarea 
-                    readOnly
-                    value={generateAIPrompt()}
-                    className="w-full h-48 p-4 text-sm font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
-                 />
-                 <button 
-                    onClick={copyToClipboard}
-                    className="absolute top-3 right-3 bg-white dark:bg-zinc-800 shadow-sm border border-zinc-200 dark:border-zinc-700 p-2 rounded-md hover:bg-zinc-50 text-zinc-600 dark:text-zinc-300 transition-colors tooltip"
-                    title="Copy to Clipboard"
-                 >
-                    <Copy size={16} />
-                 </button>
-               </div>
              </div>
           </div>
         )}
@@ -426,57 +410,43 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
         }}
       >
         <style jsx global>{`
-            .input-field {
-               @apply w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all;
-            }
-            .control-group {
-               @apply space-y-3;
-            }
-            .badge {
-               @apply text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold border border-zinc-200 dark:border-zinc-700;
-            }
-            .control-buttons {
-               @apply flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800;
-            }
-            .control-buttons button {
-               @apply flex-1 p-2 hover:bg-white dark:hover:bg-zinc-700 rounded-lg shadow-sm transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 flex justify-center;
-            }
-            .separator {
-               @apply w-px h-4 bg-zinc-200 dark:bg-zinc-700;
-            }
+            .input-field { @apply w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all; }
+            .badge { @apply text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-500 font-bold border border-zinc-200 dark:border-zinc-700; }
+            .control-buttons { @apply flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800; }
+            .control-buttons button { @apply flex-1 p-2 hover:bg-white dark:hover:bg-zinc-700 rounded-lg shadow-sm transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 flex justify-center; }
+            .separator { @apply w-px h-4 bg-zinc-200 dark:bg-zinc-700; }
             @media print {
                 body * { visibility: hidden; }
                 .page-container-print, .page-container-print * { visibility: visible; }
-                .page-container-print { 
-                    position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; 
-                }
+                .page-container-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
                 nav, aside, header, .no-print { display: none !important; }
             }
         `}</style>
 
         <div className="page-container-print">
             {/* Header Date */}
-            <div className="text-right mb-6">
-                {jobData.cityDate}
-            </div>
+            <div className="text-right mb-6">{jobData.cityDate}</div>
 
             {/* Recipient */}
             <div className="text-left mb-8">
                 Perihal: <strong>Lamaran Pekerjaan</strong><br /><br />
                 Yth.<br />
-                <strong>{jobData.destination}<br />
-                {jobData.companyName}</strong><br />
-                di<br />
-                Tempat
+                <strong>{jobData.destination}<br />{jobData.companyName}</strong><br />
+                di<br />Tempat
             </div>
 
             {/* Content */}
             <div className="text-justify">
                 <p className="mb-4">Dengan hormat,</p>
 
-                <p className="mb-4">Berdasarkan informasi yang saya peroleh bahwa {jobData.companyName} yang Bapak/Ibu pimpin saat ini sedang membutuhkan tenaga kerja untuk posisi <strong>{jobData.position}</strong>.</p>
+                {/* Paragraf Pembuka Dinamis */}
+                <p className="mb-4">
+                  {letterContent.paragraphOpening.includes('posisi') ? letterContent.paragraphOpening : 
+                   `${letterContent.paragraphOpening} posisi ${jobData.position}.`}
+                </p>
 
-                <p className="mb-4">Oleh karena itu, melalui surat ini saya mengajukan permohonan untuk melamar kerja dan mengisi posisi tersebut. Latar belakang pendidikan saya di bidang {userData.education} melatih saya untuk berpikir logis, analitis, dan cepat beradaptasi.</p>
+                {/* Paragraf Isi Dinamis */}
+                <p className="mb-4">{letterContent.paragraphBody}</p>
 
                 <p className="mb-4">Adapun data diri saya sebagai berikut:</p>
 
@@ -499,31 +469,21 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
                     ))}
                 </ol>
 
-                <p className="mb-4">Besar harapan saya untuk diberi kesempatan wawancara, dan dapat menjelaskan lebih mendalam mengenai diri saya. Saya mempunyai latar belakang pendidikan, motivasi yang tinggi dan mau belajar.</p>
-
-                <p className="mb-4">Demikian saya sampaikan, terima kasih atas perhatian Bapak/Ibu.</p>
+                {/* Paragraf Penutup Dinamis */}
+                <p className="mb-4">{letterContent.paragraphClosing}</p>
             </div>
 
             {/* Signature Section */}
             <div className="mt-8 relative h-40">
                 <p>Hormat Saya,</p>
-
-                {/* Draggable Signature Result */}
                 {signatureImage && (
                     <img 
-                        ref={dragItemRef}
-                        src={signatureImage} 
-                        alt="Tanda Tangan" 
-                        onMouseDown={handleDragStart}
-                        onTouchStart={handleDragStart}
+                        ref={dragItemRef} src={signatureImage} alt="Tanda Tangan" 
+                        onMouseDown={handleDragStart} onTouchStart={handleDragStart}
                         className="absolute h-[70px] cursor-move z-10 hover:outline hover:outline-2 hover:outline-dashed hover:outline-zinc-300"
-                        style={{
-                            left: position.x,
-                            top: position.y
-                        }}
+                        style={{ left: position.x, top: position.y }}
                     />
                 )}
-
                 <p className="font-bold underline mt-20 relative z-0">{userData.fullName}</p>
             </div>
         </div>
@@ -532,38 +492,16 @@ Buat bahasa yang formal namun tidak kaku. Tekankan bahwa latar belakang pendidik
       {/* --- TOOLS TANDA TANGAN --- */}
       <div className="mt-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm text-center print:hidden w-full max-w-md">
         <h3 className="text-zinc-900 dark:text-white font-bold mb-4">Area Tanda Tangan</h3>
-        
         <div className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl inline-block">
-            <canvas 
-                ref={canvasRef}
-                width={300} 
-                height={100} 
-                className="bg-white border border-zinc-200 dark:border-zinc-700 rounded-lg mx-auto touch-none cursor-crosshair shadow-inner"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseOut={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-            />
+            <canvas ref={canvasRef} width={300} height={100} className="bg-white border border-zinc-200 dark:border-zinc-700 rounded-lg mx-auto touch-none cursor-crosshair shadow-inner"
+                onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} />
         </div>
-
         <div className="flex gap-2 justify-center mt-6">
-            <button onClick={clearCanvas} className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors">
-                <Trash2 size={16} /> Hapus
-            </button>
-            <button onClick={useSignature} className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 font-medium text-sm transition-colors">
-                <Check size={16} /> Pakai
-            </button>
-            <label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium text-sm cursor-pointer transition-colors">
-                <Upload size={16} /> Upload
-                <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-            </label>
+            <button onClick={clearCanvas} className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors"><Trash2 size={16}/> Hapus</button>
+            <button onClick={useSignature} className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 font-medium text-sm transition-colors"><Check size={16}/> Pakai</button>
+            <label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium text-sm cursor-pointer transition-colors"><Upload size={16}/> Upload <input type="file" accept="image/*" onChange={handleUpload} className="hidden"/></label>
         </div>
-        <p className="text-xs text-zinc-400 mt-4 px-4">*Tanda tangan di kotak atau upload gambar, klik "Pakai", lalu geser tanda tangan di surat ke posisi yang pas.</p>
       </div>
-
     </div>
   );
 };
