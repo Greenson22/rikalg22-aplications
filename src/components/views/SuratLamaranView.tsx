@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Printer, Type, AlignJustify, Move, Trash2, Check, Upload, 
   Settings2, Plus, Minus, User, Briefcase, Bot, Copy, 
-  ArrowDownToLine
+  ArrowDownToLine, Edit3
 } from 'lucide-react';
 import { Button } from '../elements/Button';
 
@@ -72,6 +72,13 @@ export const SuratLamaranView = () => {
     paragraphClosing: "Besar harapan saya untuk dapat diberikan kesempatan wawancara agar dapat menjelaskan lebih mendalam mengenai potensi diri saya. Demikian surat lamaran ini saya buat, atas perhatian Bapak/Ibu saya ucapkan terima kasih."
   });
 
+  // State Instruksi Prompt AI (NEW)
+  const [promptInstructions, setPromptInstructions] = useState({
+    opening: "Kalimat pembuka yang menyebutkan sumber info lowongan...",
+    body: "Paragraf inti yang menjelaskan skill, pengalaman, dan motivasi...",
+    closing: "Kalimat penutup yang berisi harapan wawancara..."
+  });
+
   // State Profil Tersimpan
   const [savedProfiles, setSavedProfiles] = useState<UserProfile[]>([]);
 
@@ -109,7 +116,6 @@ export const SuratLamaranView = () => {
   };
 
   // --- LOGIC AI JSON GENERATOR & IMPORT ---
-  // Fix: Menggunakan kurung kurawal { ... } karena ada keyword 'return'
   const generateAIPrompt = () => {
     return `Bertindaklah sebagai asisten karir profesional. Saya ingin melamar pekerjaan dan membutuhkan surat lamaran yang personal dan profesional.
     
@@ -135,9 +141,9 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
     "attachments": "Daftar lampiran dipisah koma"
   },
   "letterContent": {
-    "paragraphOpening": "Kalimat pembuka yang menyebutkan sumber info lowongan...",
-    "paragraphBody": "Paragraf inti yang menjelaskan skill, pengalaman, dan motivasi...",
-    "paragraphClosing": "Kalimat penutup yang berisi harapan wawancara..."
+    "paragraphOpening": "${promptInstructions.opening}",
+    "paragraphBody": "${promptInstructions.body}",
+    "paragraphClosing": "${promptInstructions.closing}"
   }
 }`;
   };
@@ -347,20 +353,60 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
           </div>
         )}
 
-        {/* --- TAB: AI GENERATOR (NEW JSON MODE) --- */}
+        {/* --- TAB: AI GENERATOR (UPDATED) --- */}
         {activeTab === 'ai' && (
-          <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 md:grid-cols-2 gap-6">
-             {/* Kiri: Generate Prompt */}
-             <div className="space-y-3">
-                <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
+          <div className="animate-in fade-in zoom-in-95 duration-200 grid grid-cols-1 lg:grid-cols-3 gap-6">
+             
+             {/* Kolom Kiri: Konfigurasi Prompt */}
+             <div className="space-y-3 lg:col-span-1">
+                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl p-4">
+                  <h4 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2 mb-2 text-sm">
+                    <Edit3 size={16}/> Konfigurasi Instruksi
+                  </h4>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mb-3">
+                    Ubah instruksi di bawah ini untuk mengarahkan gaya bahasa AI (misal: "Buat lebih santai").
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Pembuka</label>
+                      <input 
+                        className="input-field text-xs" 
+                        value={promptInstructions.opening}
+                        onChange={(e) => setPromptInstructions({...promptInstructions, opening: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Isi</label>
+                      <input 
+                        className="input-field text-xs" 
+                        value={promptInstructions.body}
+                        onChange={(e) => setPromptInstructions({...promptInstructions, body: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-500 uppercase">Instruksi Penutup</label>
+                      <input 
+                        className="input-field text-xs" 
+                        value={promptInstructions.closing}
+                        onChange={(e) => setPromptInstructions({...promptInstructions, closing: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+             </div>
+
+             {/* Kolom Tengah: Copy Prompt */}
+             <div className="space-y-3 lg:col-span-1">
+                <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4 h-full">
                    <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2 text-sm">
-                     1. Buat Prompt
+                     <Copy size={16}/> 1. Salin Prompt
                    </h4>
                    <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
-                     Salin instruksi ini ke Gemini/ChatGPT agar mereka membuatkan data surat dalam format JSON.
+                     Salin instruksi ini (termasuk konfigurasi Anda) ke Gemini/ChatGPT.
                    </p>
-                   <div className="relative">
-                     <textarea readOnly value={generateAIPrompt()} className="w-full h-32 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none" />
+                   <div className="relative h-[200px] lg:h-[250px]">
+                     <textarea readOnly value={generateAIPrompt()} className="w-full h-full p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:outline-none" />
                      <button onClick={copyToClipboard} className="absolute top-2 right-2 bg-white p-1.5 rounded-md shadow-sm border border-zinc-200 hover:bg-zinc-50 text-zinc-600" title="Copy">
                         <Copy size={14} />
                      </button>
@@ -368,11 +414,11 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
                 </div>
              </div>
 
-             {/* Kanan: Import JSON */}
-             <div className="space-y-3">
+             {/* Kolom Kanan: Import JSON */}
+             <div className="space-y-3 lg:col-span-1">
                 <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full flex flex-col">
                    <h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm">
-                     2. Import JSON dari AI
+                     <ArrowDownToLine size={16}/> 2. Import JSON
                    </h4>
                    <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">
                      Paste balasan JSON dari AI di sini untuk mengisi surat otomatis.
@@ -388,7 +434,7 @@ PENTING: Berikan output HANYA dalam format JSON valid (tanpa markdown \`\`\`json
                       disabled={!jsonInput}
                       className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
                    >
-                      <ArrowDownToLine size={16} /> Terapkan ke Surat
+                      <ArrowDownToLine size={16} /> Terapkan
                    </button>
                 </div>
              </div>
