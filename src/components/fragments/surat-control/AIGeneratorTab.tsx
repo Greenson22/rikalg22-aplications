@@ -1,6 +1,6 @@
 // src/components/fragments/surat-control/AIGeneratorTab.tsx
 import React, { useState } from 'react';
-import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, RefreshCw, ScanLine, Type } from 'lucide-react';
+import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, RefreshCw, ScanLine, Type, MessageSquarePlus } from 'lucide-react';
 import { DataRow, AttachmentItem, JobTarget, UserProfile } from '../../../types/surat';
 import { Button } from '../../elements/Button';
 
@@ -19,7 +19,7 @@ interface AIGeneratorTabProps {
   setTargetJob: (val: JobTarget) => void;
   promptLength: 'normal' | 'short';
   setPromptLength: (val: 'normal' | 'short') => void;
-  onGeneratePrompt: () => void; // Kita akan override ini di dalam component
+  onGeneratePrompt: () => void; 
   jsonInput: string;
   setJsonInput: (val: string) => void;
   onImportJson: () => void;
@@ -46,7 +46,7 @@ export const AIGeneratorTab = ({
   attachments, onToggleAttachment, onUpdateAttachment, onDeleteAttachment, onAddAttachment,
   targetJob, setTargetJob,
   promptLength, setPromptLength,
-  onGeneratePrompt: originalOnGenerate, // Rename prop asli
+  onGeneratePrompt: originalOnGenerate, 
   jsonInput, setJsonInput, onImportJson,
   onResetData, onSaveProfile,
   savedProfiles, setSavedProfiles, onLoadProfile
@@ -55,8 +55,10 @@ export const AIGeneratorTab = ({
   const [showAttachmentInputs, setShowAttachmentInputs] = useState(true);
   const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
   
-  // MODE INPUT: 'manual' (ketik posisi) atau 'pamphlet' (analisa gambar)
+  // MODE INPUT
   const [inputMode, setInputMode] = useState<'manual' | 'pamphlet'>('manual');
+  // INFO TAMBAHAN (State Baru)
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
 
   // State Manage Profile Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
@@ -69,10 +71,15 @@ export const AIGeneratorTab = ({
     const att = attachments.filter(a => a.isChecked).map(a => a.text).join(', ');
     const style = promptLength === 'short' ? "SINGKAT & PADAT (maks 2 paragraf)" : "PROFESIONAL & LENGKAP (3 paragraf)";
     
+    // Siapkan blok instruksi tambahan jika user mengisinya
+    const extraInstructionsBlock = additionalInstructions.trim() 
+        ? `\nINSTRUKSI SPESIFIK/TAMBAHAN DARI SAYA:\n"${additionalInstructions}"\n(Harap ikuti instruksi tambahan ini dalam penulisan surat)`
+        : "";
+
     let promptText = "";
 
     if (inputMode === 'manual') {
-        // Mode Lama: Data Lowongan diketik manual
+        // Mode Manual
         promptText = `
 DATA SAYA:
 ${personal}
@@ -81,30 +88,36 @@ Lampiran: ${att}
 INFO LOWONGAN:
 Posisi: ${targetJob.position}
 Perusahaan: ${targetJob.company}
-Syarat/Konteks: ${targetJob.requirements}
+Syarat/Konteks Lowongan: ${targetJob.requirements}
 
-INSTRUKSI:
-Buat surat lamaran kerja ${style} berdasarkan data di atas.
+GAYA SURAT: ${style}
+${extraInstructionsBlock}
+
+INSTRUKSI UTAMA:
+Buat surat lamaran kerja berdasarkan data di atas.
 Output WAJIB format JSON valid tanpa markdown code block:
 {
   "header": { "cityDate": "...", "subject": "...", "recipientTitle": "...", "companyName": "...", "recipientAddress": "..." },
   "paragraphs": ["Paragraf pembuka...", "Paragraf isi (skill match)...", "Paragraf penutup..."]
 }`;
     } else {
-        // Mode Baru: Pamflet/Poster
+        // Mode Pamflet
         promptText = `
 INSTRUKSI UTAMA:
-Saya akan melampirkan GAMBAR/TEKS lowongan kerja (pamflet) bersamaan dengan prompt ini.
+Saya akan melampirkan GAMBAR/TEKS lowongan kerja (pamflet) setelah prompt ini.
 Tolong ANALISIS lowongan tersebut untuk mengetahui Posisi, Nama Perusahaan, dan Syaratnya secara otomatis.
 
 DATA PELAMAR (SAYA):
 ${personal}
 Lampiran yang saya miliki: ${att}
 
+GAYA SURAT: ${style}
+${extraInstructionsBlock}
+
 TUGAS ANDA:
 1. Baca lowongan kerja yang saya berikan (teks/gambar).
 2. Cocokkan skill saya dengan syarat di lowongan tersebut.
-3. Buat surat lamaran kerja ${style}.
+3. Buat surat lamaran kerja sesuai gaya dan instruksi tambahan di atas.
 
 FORMAT OUTPUT (WAJIB JSON VALID):
 {
@@ -436,7 +449,7 @@ FORMAT OUTPUT (WAJIB JSON VALID):
             </div>
           </div>
 
-          {/* --- CARD 1. INFO LOWONGAN (MODIFIED FOR TABS) --- */}
+          {/* --- CARD 1. TARGET LAMARAN (MODIFIED) --- */}
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
             <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16} /> 1. Target Lamaran</h4>
             
@@ -456,13 +469,13 @@ FORMAT OUTPUT (WAJIB JSON VALID):
                 </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {inputMode === 'manual' ? (
                 // --- MODE MANUAL INPUT ---
                 <div className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-3">
                     <div><label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label><input type="text" placeholder="Contoh: Frontend Developer" value={targetJob.position} onChange={e => setTargetJob({ ...targetJob, position: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
                     <div><label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label><input type="text" placeholder="Contoh: PT Google Indonesia" value={targetJob.company} onChange={e => setTargetJob({ ...targetJob, company: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
-                    <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({ ...targetJob, requirements: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none" /></div>
+                    <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Lowongan</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js, Tailwind, minimal S1." value={targetJob.requirements} onChange={e => setTargetJob({ ...targetJob, requirements: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none" /></div>
                 </div>
               ) : (
                 // --- MODE PAMFLET (AUTO DETECT) ---
@@ -476,19 +489,29 @@ FORMAT OUTPUT (WAJIB JSON VALID):
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-200 dark:border-purple-900/50 mt-2">
+              <div className="border-t border-purple-200 dark:border-purple-900/50 pt-3 space-y-3">
+                {/* PILIHAN PANJANG SURAT */}
                 <div>
                   <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Gaya/Panjang Surat</label>
                   <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-700 p-1">
-                    <button onClick={() => setPromptLength('normal')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'normal' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}>Normal</button>
-                    <button onClick={() => setPromptLength('short')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'short' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}>Pendek</button>
+                    <button onClick={() => setPromptLength('normal')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'normal' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}>Normal / Standar</button>
+                    <button onClick={() => setPromptLength('short')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${promptLength === 'short' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-zinc-400 hover:text-zinc-600'}`}>Pendek / To-the-point</button>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Info Tambahan</label>
-                  <div className="flex items-center h-[34px] px-2 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-400">
-                    {promptLength === 'short' ? 'To-the-point (2 Paragraf)' : 'Standar (3 Paragraf)'}
-                  </div>
+
+                {/* --- FITUR TAMBAHAN: INFORMASI TAMBAHAN --- */}
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1 flex justify-between">
+                        <span>Informasi Tambahan (Opsional)</span>
+                        <span className="text-[10px] text-zinc-400 font-normal normal-case"><MessageSquarePlus size={10} className="inline mr-1"/>Instruksi khusus untuk AI</span>
+                    </label>
+                    <textarea 
+                        rows={2} 
+                        placeholder="Contoh: Tekankan pengalaman saya di organisasi, gunakan bahasa yang sangat formal, atau sebutkan saya bersedia relokasi." 
+                        value={additionalInstructions} 
+                        onChange={e => setAdditionalInstructions(e.target.value)} 
+                        className="w-full p-2 text-xs border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none focus:ring-1 focus:ring-purple-500 outline-none" 
+                    />
                 </div>
               </div>
             </div>
