@@ -25,3 +25,10 @@ export interface JobTarget {
   company: string;
   requirements: string;
 }
+
+// BARU: Interface Signature
+export interface SavedSignature {
+  id: string;
+  name: string;
+  image: string; // Base64
+}
