@@ -1,6 +1,6 @@
 // src/components/fragments/surat-control/AIGeneratorTab.tsx
 import React, { useState } from 'react';
-import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, RefreshCw } from 'lucide-react';
+import { User, FilePlus, Save, ChevronUp, ChevronDown, Briefcase, Copy, ArrowDownToLine, Settings, Plus, Trash2, X, ListChecks, Users, Edit3, RefreshCw, ScanLine, Type } from 'lucide-react';
 import { DataRow, AttachmentItem, JobTarget, UserProfile } from '../../../types/surat';
 import { Button } from '../../elements/Button';
 
@@ -19,7 +19,7 @@ interface AIGeneratorTabProps {
   setTargetJob: (val: JobTarget) => void;
   promptLength: 'normal' | 'short';
   setPromptLength: (val: 'normal' | 'short') => void;
-  onGeneratePrompt: () => void;
+  onGeneratePrompt: () => void; // Kita akan override ini di dalam component
   jsonInput: string;
   setJsonInput: (val: string) => void;
   onImportJson: () => void;
@@ -46,7 +46,7 @@ export const AIGeneratorTab = ({
   attachments, onToggleAttachment, onUpdateAttachment, onDeleteAttachment, onAddAttachment,
   targetJob, setTargetJob,
   promptLength, setPromptLength,
-  onGeneratePrompt,
+  onGeneratePrompt: originalOnGenerate, // Rename prop asli
   jsonInput, setJsonInput, onImportJson,
   onResetData, onSaveProfile,
   savedProfiles, setSavedProfiles, onLoadProfile
@@ -55,16 +55,82 @@ export const AIGeneratorTab = ({
   const [showAttachmentInputs, setShowAttachmentInputs] = useState(true);
   const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
   
+  // MODE INPUT: 'manual' (ketik posisi) atau 'pamphlet' (analisa gambar)
+  const [inputMode, setInputMode] = useState<'manual' | 'pamphlet'>('manual');
+
   // State Manage Profile Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null); 
   const [editFormData, setEditFormData] = useState<UserProfile | null>(null); 
 
-  // --- Handlers for Manage Profile ---
+  // --- LOGIC: GENERATE PROMPT (CUSTOM) ---
+  const handleGeneratePrompt = () => {
+    const personal = personalDetails.map(d => `- ${d.label}: ${d.value}`).join('\n');
+    const att = attachments.filter(a => a.isChecked).map(a => a.text).join(', ');
+    const style = promptLength === 'short' ? "SINGKAT & PADAT (maks 2 paragraf)" : "PROFESIONAL & LENGKAP (3 paragraf)";
+    
+    let promptText = "";
 
+    if (inputMode === 'manual') {
+        // Mode Lama: Data Lowongan diketik manual
+        promptText = `
+DATA SAYA:
+${personal}
+Lampiran: ${att}
+
+INFO LOWONGAN:
+Posisi: ${targetJob.position}
+Perusahaan: ${targetJob.company}
+Syarat/Konteks: ${targetJob.requirements}
+
+INSTRUKSI:
+Buat surat lamaran kerja ${style} berdasarkan data di atas.
+Output WAJIB format JSON valid tanpa markdown code block:
+{
+  "header": { "cityDate": "...", "subject": "...", "recipientTitle": "...", "companyName": "...", "recipientAddress": "..." },
+  "paragraphs": ["Paragraf pembuka...", "Paragraf isi (skill match)...", "Paragraf penutup..."]
+}`;
+    } else {
+        // Mode Baru: Pamflet/Poster
+        promptText = `
+INSTRUKSI UTAMA:
+Saya akan melampirkan GAMBAR/TEKS lowongan kerja (pamflet) bersamaan dengan prompt ini.
+Tolong ANALISIS lowongan tersebut untuk mengetahui Posisi, Nama Perusahaan, dan Syaratnya secara otomatis.
+
+DATA PELAMAR (SAYA):
+${personal}
+Lampiran yang saya miliki: ${att}
+
+TUGAS ANDA:
+1. Baca lowongan kerja yang saya berikan (teks/gambar).
+2. Cocokkan skill saya dengan syarat di lowongan tersebut.
+3. Buat surat lamaran kerja ${style}.
+
+FORMAT OUTPUT (WAJIB JSON VALID):
+{
+  "header": { 
+    "cityDate": "Kota, Tanggal Hari Ini", 
+    "subject": "Lamaran Pekerjaan - [Posisi yg dideteksi]", 
+    "recipientTitle": "Yth. HRD / Pimpinan", 
+    "companyName": "[Nama Perusahaan yg dideteksi]", 
+    "recipientAddress": "[Alamat Perusahaan jika ada, atau 'di Tempat']" 
+  },
+  "paragraphs": ["Paragraf pembuka (sebutkan posisi & perusahaan)", "Paragraf isi (hubungkan skill saya dengan syarat)", "Paragraf penutup"]
+}
+`;
+    }
+
+    navigator.clipboard.writeText(promptText);
+    alert(inputMode === 'manual' 
+        ? "Prompt Manual disalin!" 
+        : "Prompt Mode Pamflet disalin!\n\nLangkah selanjutnya:\n1. Buka ChatGPT/Gemini\n2. Paste Prompt ini\n3. Upload Gambar/Paste Teks Lowongan Kerja");
+  };
+
+
+  // --- Handlers for Manage Profile (Existing Logic) ---
   const handleStartEdit = (profile: UserProfile) => {
     setEditingProfileId(profile.id);
-    setEditFormData(JSON.parse(JSON.stringify(profile))); // Deep copy
+    setEditFormData(JSON.parse(JSON.stringify(profile))); 
   };
 
   const handleStartAdd = () => {
@@ -92,18 +158,13 @@ export const AIGeneratorTab = ({
     setEditFormData(null);
   };
 
-  // --- LOGIC: SAVE TO API (CREATE / UPDATE) ---
   const handleSaveEdit = async () => {
     if (!editFormData) return;
-    
-    // Auto-update fullName dari detail 'Nama' jika ada
     const namaRow = editFormData.details.find(d => d.label.toLowerCase().includes('nama'));
     const finalData = {
         ...editFormData,
         fullName: namaRow ? namaRow.value : (editFormData.fullName || "Tanpa Nama")
     };
-
-    // SYNC DATABASE
     try {
         const method = editingProfileId === 'new' ? 'POST' : 'PUT';
         const res = await fetch('/api/profiles', {
@@ -111,15 +172,12 @@ export const AIGeneratorTab = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(finalData)
         });
-        
         if (!res.ok) throw new Error("Gagal menyimpan ke database");
     } catch (e) {
         console.error(e);
         alert("Terjadi kesalahan saat menyimpan data.");
-        return; // Jangan update state jika gagal
+        return; 
     }
-
-    // UPDATE UI
     if (editingProfileId === 'new') {
         setSavedProfiles(prev => [...prev, finalData]);
     } else {
@@ -129,14 +187,11 @@ export const AIGeneratorTab = ({
     setEditFormData(null);
   };
 
-  // --- LOGIC: DELETE TO API ---
   const handleDeleteFromModal = async (id: string) => {
       if(!confirm("Hapus profil ini permanen?")) return;
-
       try {
         const res = await fetch(`/api/profiles?id=${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error("Gagal menghapus");
-        
         setSavedProfiles(prev => prev.filter(p => p.id !== id));
         if (editingProfileId === id) handleCancelEdit();
       } catch (e) {
@@ -148,9 +203,6 @@ export const AIGeneratorTab = ({
   const updateEditField = (field: 'profileName' | 'fullName', val: string) => {
       setEditFormData(prev => prev ? ({ ...prev, [field]: val }) : null);
   };
-
-  // --- Handlers for Dynamic Row Editing ---
-
   const updateEditDetailValue = (idx: number, val: string) => {
       setEditFormData(prev => {
           if(!prev) return null;
@@ -159,7 +211,6 @@ export const AIGeneratorTab = ({
           return { ...prev, details: updatedDetails };
       });
   };
-
   const updateEditDetailLabel = (idx: number, val: string) => {
       setEditFormData(prev => {
           if(!prev) return null;
@@ -168,7 +219,6 @@ export const AIGeneratorTab = ({
           return { ...prev, details: updatedDetails };
       });
   };
-
   const removeDetailRow = (idx: number) => {
       setEditFormData(prev => {
           if(!prev) return null;
@@ -176,7 +226,6 @@ export const AIGeneratorTab = ({
           return { ...prev, details: newDetails };
       });
   };
-
   const addDetailRow = (label: string = '') => {
       setEditFormData(prev => {
           if(!prev) return null;
@@ -190,7 +239,6 @@ export const AIGeneratorTab = ({
       });
   };
 
-  // Cek field standar mana yang hilang (untuk fitur restore)
   const missingStandards = editFormData 
     ? STANDARD_LABELS.filter(std => !editFormData.details.some(d => d.label.trim().toLowerCase() === std.toLowerCase()))
     : [];
@@ -208,17 +256,12 @@ export const AIGeneratorTab = ({
               <button onClick={() => setIsAttachmentModalOpen(false)} className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="p-4 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
-              <p className="text-xs text-zinc-500 mb-2">Centang item yang ingin disertakan dalam prompt/surat.</p>
               {attachments.map((att) => (
                 <div key={att.id} className="flex items-center gap-3 p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 group transition-all focus-within:ring-2 focus-within:ring-blue-500/20">
                   <input type="checkbox" checked={att.isChecked} onChange={() => onToggleAttachment(att.id)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
                   <input type="text" value={att.text} onChange={() => {}} readOnly className={`flex-1 bg-transparent text-sm border-none outline-none focus:ring-0 ${!att.isChecked ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`} placeholder="Nama dokumen..." />
-                  {/* Note: Input readOnly karena edit text lampiran ada di modal masing-masing atau parent. Disini hanya toggle. Jika ingin edit text, onUpdateAttachment harus dipasang di onChange input text */}
                 </div>
               ))}
-              <div className="text-center text-xs text-zinc-400 mt-2 italic">
-                  Untuk mengedit teks atau menghapus lampiran, gunakan tombol "Settings" di panel utama.
-              </div>
             </div>
             <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-2xl space-y-3">
               <Button onClick={() => setIsAttachmentModalOpen(false)} className="w-full justify-center">Selesai</Button>
@@ -239,7 +282,6 @@ export const AIGeneratorTab = ({
                     <button onClick={handleStartAdd} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition"><Plus size={14}/> Tambah Baru</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                    {savedProfiles.length === 0 && <p className="text-center text-xs text-zinc-400 mt-4">Belum ada data.</p>}
                     {savedProfiles.map(p => (
                         <div key={p.id} onClick={() => handleStartEdit(p)} className={`p-3 rounded-lg border cursor-pointer transition-all ${editingProfileId === p.id ? 'bg-white shadow-md border-blue-500 ring-1 ring-blue-500' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-blue-300'}`}>
                             <div className="flex justify-between items-start">
@@ -274,75 +316,38 @@ export const AIGeneratorTab = ({
                                     <label className="text-xs font-bold text-zinc-500 uppercase">Nama Profil (Label)</label>
                                     <input type="text" value={editFormData.profileName} onChange={e => updateEditField('profileName', e.target.value)} className="w-full mt-1 p-2 text-sm border rounded-lg bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Misal: Profil Saya (Formal)" />
                                 </div>
-                                
                                 <div className="border-t border-zinc-100 dark:border-zinc-800 my-4"></div>
-                                
                                 <div className="flex justify-between items-end mb-2">
                                   <h4 className="font-bold text-sm text-zinc-700 dark:text-zinc-300">Detail Data Diri</h4>
                                   <button onClick={() => addDetailRow()} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition"><Plus size={10}/> Custom Field</button>
                                 </div>
-
                                 <div className="space-y-2">
                                   {editFormData.details.map((detail, idx) => (
                                       <div key={idx} className="group flex items-center gap-2">
-                                          {/* Input Label */}
                                           <div className="w-1/3">
-                                               <input 
-                                                 type="text" 
-                                                 value={detail.label} 
-                                                 onChange={e => updateEditDetailLabel(idx, e.target.value)}
-                                                 className="w-full bg-transparent text-[10px] font-bold text-zinc-500 uppercase text-right pr-2 border-b border-transparent focus:border-blue-400 outline-none transition-colors hover:text-zinc-700"
-                                                 placeholder="LABEL..."
-                                               />
+                                               <input type="text" value={detail.label} onChange={e => updateEditDetailLabel(idx, e.target.value)} className="w-full bg-transparent text-[10px] font-bold text-zinc-500 uppercase text-right pr-2 border-b border-transparent focus:border-blue-400 outline-none transition-colors hover:text-zinc-700" placeholder="LABEL..." />
                                           </div>
-                                          {/* Input Value */}
                                           <div className="flex-1 relative">
-                                              <input 
-                                                type="text" 
-                                                value={detail.value} 
-                                                onChange={e => updateEditDetailValue(idx, e.target.value)} 
-                                                className="w-full p-1.5 text-xs border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:border-blue-500 outline-none pr-8" 
-                                                placeholder={`Isi data...`}
-                                              />
+                                              <input type="text" value={detail.value} onChange={e => updateEditDetailValue(idx, e.target.value)} className="w-full p-1.5 text-xs border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 focus:border-blue-500 outline-none pr-8" placeholder={`Isi data...`} />
                                           </div>
-                                          {/* Delete Button */}
-                                          <button 
-                                            onClick={() => removeDetailRow(idx)}
-                                            className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded transition-all opacity-0 group-hover:opacity-100"
-                                            title="Hapus baris ini"
-                                          >
-                                            <Trash2 size={14} />
-                                          </button>
+                                          <button onClick={() => removeDetailRow(idx)} className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded transition-all opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
                                       </div>
                                   ))}
                                 </div>
-
-                                {/* Section Restore Data Standar */}
                                 {missingStandards.length > 0 && (
                                   <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-dashed border-blue-200 dark:border-blue-800">
-                                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
-                                      <RefreshCw size={10} /> Kembalikan Data Standar:
-                                    </p>
+                                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1"><RefreshCw size={10} /> Kembalikan Data Standar:</p>
                                     <div className="flex flex-wrap gap-2">
                                       {missingStandards.map(label => (
-                                        <button 
-                                          key={label}
-                                          onClick={() => addDetailRow(label)}
-                                          className="text-[10px] px-2 py-1 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-zinc-700 rounded-md text-zinc-600 dark:text-zinc-300 hover:text-blue-600 hover:border-blue-400 transition shadow-sm"
-                                        >
-                                          + {label}
-                                        </button>
+                                        <button key={label} onClick={() => addDetailRow(label)} className="text-[10px] px-2 py-1 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-zinc-700 rounded-md text-zinc-600 dark:text-zinc-300 hover:text-blue-600 hover:border-blue-400 transition shadow-sm">+ {label}</button>
                                       ))}
                                     </div>
                                   </div>
                                 )}
-
-                                <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-4">Catatan: Mengedit di sini hanya mengubah data yang disimpan, tidak langsung mengubah tampilan surat utama kecuali Anda memilihnya lagi.</p>
                             </div>
                         )
                     )}
                 </div>
-
                 {editingProfileId && (
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3 bg-zinc-50 dark:bg-zinc-900/50">
                         <Button variant="ghost" onClick={handleCancelEdit} className="text-xs">Batal</Button>
@@ -369,7 +374,6 @@ export const AIGeneratorTab = ({
             </div>
             
             <div className="space-y-3">
-              {/* Dropdown Select Profile */}
               <div className="bg-zinc-50 dark:bg-zinc-800/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center gap-2">
                  <Users size={16} className="ml-2 text-zinc-400"/>
                  <select onChange={onLoadProfile} className="w-full bg-transparent p-1.5 text-xs font-medium outline-none text-zinc-700 dark:text-zinc-300 cursor-pointer">
@@ -426,21 +430,53 @@ export const AIGeneratorTab = ({
                         {att.text}
                       </div>
                     ))}
-                    {attachments.length === 0 && <p className="col-span-2 text-[10px] text-zinc-400 italic text-center">Belum ada lampiran. Klik "Kelola / Edit".</p>}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ... (Job Info & Generate Prompt Cards) ... */}
+          {/* --- CARD 1. INFO LOWONGAN (MODIFIED FOR TABS) --- */}
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl p-4">
-            <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16} /> 1. Info Lowongan & Opsi</h4>
-            <div className="space-y-3">
-              <div><label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label><input type="text" placeholder="Contoh: Frontend Developer" value={targetJob.position} onChange={e => setTargetJob({ ...targetJob, position: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
-              <div><label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label><input type="text" placeholder="Contoh: PT Google Indonesia" value={targetJob.company} onChange={e => setTargetJob({ ...targetJob, company: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
+            <h4 className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-4 text-sm"><Briefcase size={16} /> 1. Target Lamaran</h4>
+            
+            {/* Tab Switcher Mode */}
+            <div className="flex bg-white dark:bg-black p-1 rounded-lg border border-purple-100 dark:border-zinc-700 mb-4">
+                <button 
+                    onClick={() => setInputMode('manual')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${inputMode === 'manual' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                >
+                    <Type size={14}/> Manual Input
+                </button>
+                <button 
+                    onClick={() => setInputMode('pamphlet')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${inputMode === 'pamphlet' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                >
+                    <ScanLine size={14}/> Scan Pamflet/Gambar
+                </button>
+            </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="space-y-3">
+              {inputMode === 'manual' ? (
+                // --- MODE MANUAL INPUT ---
+                <div className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-3">
+                    <div><label className="text-xs font-semibold text-zinc-500 uppercase">Posisi Dilamar</label><input type="text" placeholder="Contoh: Frontend Developer" value={targetJob.position} onChange={e => setTargetJob({ ...targetJob, position: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
+                    <div><label className="text-xs font-semibold text-zinc-500 uppercase">Nama Perusahaan</label><input type="text" placeholder="Contoh: PT Google Indonesia" value={targetJob.company} onChange={e => setTargetJob({ ...targetJob, company: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700" /></div>
+                    <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({ ...targetJob, requirements: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none" /></div>
+                </div>
+              ) : (
+                // --- MODE PAMFLET (AUTO DETECT) ---
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300 bg-white/50 dark:bg-black/20 rounded-lg p-4 border border-dashed border-purple-300 dark:border-purple-800 text-center">
+                    <ScanLine size={32} className="mx-auto text-purple-400 mb-2"/>
+                    <p className="text-sm font-bold text-purple-800 dark:text-purple-200">Mode Auto-Detect Aktif</p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                        Anda tidak perlu mengisi posisi/perusahaan manual. <br/>
+                        Nanti, <b>paste prompt</b> yang dihasilkan ke AI, lalu <b>upload gambar lowongan</b> (pamflet) Anda. AI akan membaca detailnya otomatis.
+                    </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-200 dark:border-purple-900/50 mt-2">
                 <div>
                   <label className="text-xs font-semibold text-zinc-500 uppercase block mb-1">Gaya/Panjang Surat</label>
                   <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-700 p-1">
@@ -455,21 +491,26 @@ export const AIGeneratorTab = ({
                   </div>
                 </div>
               </div>
-
-              <div><label className="text-xs font-semibold text-zinc-500 uppercase">Syarat / Konteks Khusus</label><textarea rows={2} placeholder="Contoh: Harus bisa React.js dan Tailwind." value={targetJob.requirements} onChange={e => setTargetJob({ ...targetJob, requirements: e.target.value })} className="w-full mt-1 p-2 text-sm border rounded-lg bg-white dark:bg-black dark:border-zinc-700 resize-none" /></div>
             </div>
           </div>
 
           <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
             <h4 className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-2 text-sm"><Copy size={16} /> 2. Generate Prompt</h4>
-            <p className="text-xs text-zinc-500 mb-3">Sistem akan menggabungkan Data Pelamar & Lampiran dengan Info Lowongan.</p>
-            <button onClick={onGeneratePrompt} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-bold hover:shadow-lg transition-all active:scale-95">Salin Prompt ke Clipboard</button>
+            <p className="text-xs text-zinc-500 mb-3">
+                {inputMode === 'manual' 
+                    ? "Sistem akan menggabungkan Data Pelamar & Input Manual Lowongan." 
+                    : "Sistem akan membuat instruksi agar AI membaca gambar lowongan Anda."}
+            </p>
+            <button onClick={handleGeneratePrompt} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg text-sm font-bold hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                <Copy size={16}/> {inputMode === 'manual' ? 'Salin Prompt Manual' : 'Salin Prompt Mode Pamflet'}
+            </button>
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 h-full flex flex-col">
             <h4 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 mb-2 text-sm"><ArrowDownToLine size={16} /> 3. Import JSON Result</h4>
+            <p className="text-xs text-zinc-500 mb-2">Setelah AI membalas dengan kode JSON, salin dan tempel di sini.</p>
             <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} placeholder='Contoh: { "header": { ... } }' className="w-full flex-1 p-3 text-xs font-mono bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 outline-none" />
             <button onClick={onImportJson} disabled={!jsonInput} className="mt-3 w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md">Terapkan ke Surat</button>
           </div>
